@@ -27,6 +27,7 @@ const BoulderLevel = (() => {
       phase: 1,                // 1 = leaving, 2 = back to gas station, 3 = for real
       objs: [], signs: [], floaters: [], devils: [],
       flowers: 0, toes: 0, bikesHit: 0, carsTotalled: 0, zoom: 1, shrinkT: 0, smallPending: false,
+      lift: 0, chase: { on: false, gap: 420, x: LANES[1], taunt: 6 },
       invuln: 0, spinT: 0, spinDur: 0.7, boostT: 0, waterT: 0, flipT: 0,
       nextToe: 7, flags: {}, snickersMisses: 0,
       p2Start: 0, p2End: 0, p3Start: 0, p3End: 0,
@@ -91,7 +92,7 @@ const BoulderLevel = (() => {
   }
 
   // ---------- Update ----------
-  function py() { return Engine.H - 170; } // player's screen y
+  function py() { return Engine.H - 170 - s.lift; } // player's screen y (moves up during the chase)
   function screenY(o) { return py() - ((o.wy !== undefined ? o.wy : o.e) - s.dist); }
 
   function update(dt) {
@@ -137,6 +138,7 @@ const BoulderLevel = (() => {
     s.x = clamp(s.x + s.vx * dt, BIKE_L - 20, BIKE_R + 20);
 
     if (s.state === "drive") events(dt);
+    updateChase(dt);
     updateDevils(dt);
     updateObjects(dt);
     updateHud();
@@ -195,6 +197,34 @@ const BoulderLevel = (() => {
     s.devils = s.devils.filter((d) => d.t < d.life);
   }
 
+  // The frat van: sits behind you, gains when you crash, steals flowers if it catches you
+  function updateChase(dt) {
+    const c = s.chase;
+    const want = c.on ? 115 : 0;
+    s.lift += (want - s.lift) * Math.min(1, dt * 2);
+    if (!c.on) { c.gap += 220 * dt; return; }
+    c.x += (s.x - c.x) * Math.min(1, dt * 1.6);
+    if (c.gap > 160) c.gap -= (c.gap - 160) * Math.min(1, dt * 1.2);
+    else c.gap = Math.min(160, c.gap + 14 * dt);
+    if (s.state !== "drive") return;
+    c.taunt -= dt;
+    if (c.taunt <= 0) {
+      c.taunt = rand(6, 9);
+      Sfx.honk();
+      Engine.toast(pick(L.fratTaunts));
+    }
+    if (c.gap < 70) {
+      c.gap = 240;
+      Sfx.honk(); Sfx.crash();
+      Engine.shake = 8;
+      s.invuln = 1.5;
+      const lost = Math.min(2, s.flowers);
+      s.flowers -= lost;
+      if (lost) s.floaters.push({ x: s.x, y: py() - 40, text: "-" + lost + " 🌼", t: 0 });
+      Engine.toast(L.fratCaught, "bad");
+    }
+  }
+
   function startToe(win) {
     ToePrompt.start((ok) => {
       if (ok) { s.toes++; }
@@ -211,6 +241,7 @@ const BoulderLevel = (() => {
     if (me.dead) return;
     const cut = $("snack");
     $("snackText").textContent = L.snackBreak;
+    Voice.play(L.snackBreak, "interrupt");
     cut.classList.remove("show"); void cut.offsetWidth; // restart the animations
     cut.classList.add("show");
     Sfx.munch();
@@ -219,6 +250,7 @@ const BoulderLevel = (() => {
     await wait(3600);
     if (me.dead) return;
     $("snackText").textContent = L.snackDone;
+    Voice.play(L.snackDone, "queue");
     await wait(1800);
     if (me.dead) return;
     cut.classList.remove("show");
@@ -291,11 +323,18 @@ const BoulderLevel = (() => {
     s.speed = Math.min(s.speed, 120);
     await Engine.say(L.gotSnickers);
     if (me.dead) return;
+    // the frat guys spotted us
+    s.chase.on = true;
+    s.chase.gap = 420;
+    s.chase.x = s.x;
+    Sfx.honk();
+    await Engine.say(L.fratsAppear);
+    if (me.dead) return;
     s.phase = 3;
     s.p3Start = s.dist;
-    s.p3End = s.dist + 2400;
+    s.p3End = s.dist + 3800;
     s.objs = s.objs.filter((o) => screenY(o) > py() + 40);
-    generate(s.p3Start, s.p3End - 400, { density: 0.2, gap: [300, 360] });
+    generate(s.p3Start, s.p3End - 400, { density: 0.3, gap: [280, 340] });
     addSign(s.p3Start + 600, L.signs[5]);
     s.finishes.push({ e: s.p3End, label: L.finalSign, color: "#1e7a46" });
     s.state = "drive";
@@ -309,7 +348,11 @@ const BoulderLevel = (() => {
     ToePrompt.cancel();
     Sfx.fanfare();
     Confetti.burst(160, Engine.W);
-    await wait(1800);
+    s.chase.on = false;
+    Engine.toast(L.fratLost, "good");
+    await wait(2200);
+    if (me.dead) return;
+    await Engine.say(L.outro);
     if (me.dead) return;
     Save.finish("boulder", { flowers: s.flowers, toes: s.toes, charm: true });
     Game.showComplete({
@@ -330,6 +373,7 @@ const BoulderLevel = (() => {
     Sfx.crash();
     Engine.shake = 10;
     s.invuln = 1.4;
+    if (s.chase.on) s.chase.gap -= 80; // crashing lets the frat van catch up
     s.speed = 75;
     if (s.flowers > 0) {
       s.flowers--;
@@ -522,6 +566,8 @@ const BoulderLevel = (() => {
       ctx.fillStyle = "rgba(255,210,63,.5)";
       for (let i = 0; i < 4; i++) ctx.fillRect(s.x - 16 + i * 10, P + 38 + Math.random() * 10, 4, 18 + Math.random() * 20);
     }
+    if (s.chase.gap < 400) Art.fratVan(ctx, s.chase.x, P + s.chase.gap, s.t);
+    Art.balloon(ctx, s.x + 14, P + 34, s.t, s.vx);
     Art.playerCar(ctx, s.x, P, s.vx / 300 * 0.2 + spin, blink);
     if (s.munching) {
       ctx.fillStyle = "#fff";

@@ -2,11 +2,21 @@
 //  ALL THE WORDS IN THE GAME LIVE HERE.
 //  Edit anything between the quotes. Keep the quotes and commas.
 //  Every line starts with "YO JOHN" — that's the law.
+//
+//  VOICE: record any line on the recording page (record.html).
+//  If you change a line's words, re-record it. If you add, remove
+//  or reorder lines inside a [ list ], re-record that list.
 // ============================================================
 
 const LINES = {
   title: "You really thought you weren't gonna have to drive home again",
   subtitle: "Boulder → Durango. Don't forget to hook the toe.",
+  soundHint: "🔊 Turn your sound on.",
+
+  // Birthday countdown on the map ({n} becomes the number of days)
+  birthdayCountdown: "🎂 {n} days till the birthday",
+  birthdayTomorrow: "🎂 The birthday is TOMORROW",
+  birthdayToday: "🎂 IT'S THE BIRTHDAY!",
 
   // Shown under each stop on the map before it opens
   lockedText: "YO JOHN, not yet. Opens",
@@ -54,7 +64,9 @@ const LINES = {
   boulder: {
     name: "Boulder",
     intro: [
-      "YO JOHN, it's time to drive home to Durango.",
+      "YO JOHN. I need to get out of Boulder. The frats here violate penguins.",
+      "And my birthday is in 5 days. I HAVE to be home in Durango by the 25th.",
+      "Will you help me get there?",
       "Steer with the arrow keys (or the buttons on your phone). Grab the chrysanthemums. Don't hit the bikes. Boulder has a LOT of bikes.",
       "Kombucha makes you go fast. And avoid the puddles, because THE WATER IS COLD.",
       "And if you see HOOK THE TOE... hook the toe. (Tap it, or hit Space.)",
@@ -85,6 +97,25 @@ const LINES = {
     backSign: "YO JOHN, gas station: back that way (ugh)",
     missedSnickers: "YO JOHN, you drove right past the Snickers. Again.",
     gotSnickers: "YO JOHN, SNICKERS ACQUIRED. You found the Snickers charm for your bracelet!",
+
+    // The frat guys show up for the last stretch
+    fratsAppear: [
+      "YO JOHN... is that a frat van?",
+      "THE FRAT GUYS SAW US AT THE GAS STATION. DRIVE!",
+    ],
+    fratTaunts: [
+      "YO JOHN, they're yelling SEND IT.",
+      "YO JOHN, they're blasting Mr. Brightside.",
+      "YO JOHN, one of them is doing a keg stand IN the van.",
+      "YO JOHN, they want to know if you're coming to the darty.",
+    ],
+    fratCaught: "YO JOHN, THE FRAT GUYS GOT YOU. They took 2 flowers.",
+    fratLost: "YO JOHN, we lost them. For now.",
+
+    outro: [
+      "YO JOHN, WE MADE IT OUT OF BOULDER.",
+      "One leg down, four to go. Kenosha Pass opens tomorrow.",
+    ],
     finalSign: "US-285 SOUTH → Durango",
     note:
       "YO JOHN, you made it out of Boulder! I know the drive is long, but every mile gets you closer to the people who love you. I'm so proud of you. (Placeholder: write your Day 1 note here!)",

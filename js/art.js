@@ -1,7 +1,7 @@
 // Everything is drawn in code — no image files needed.
 
 const PENGUIN_SVG = `
-<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 -14 100 134" xmlns="http://www.w3.org/2000/svg">
   <ellipse cx="22" cy="72" rx="9" ry="22" fill="#1b1f2e" transform="rotate(20 22 72)"/>
   <ellipse cx="78" cy="72" rx="9" ry="22" fill="#1b1f2e" transform="rotate(-20 78 72)"/>
   <ellipse cx="50" cy="66" rx="32" ry="44" fill="#1b1f2e"/>
@@ -14,6 +14,11 @@ const PENGUIN_SVG = `
   <path d="M26 30 Q50 18 74 30 L72 36 Q50 26 28 36 Z" fill="#e63946"/>
   <ellipse cx="38" cy="110" rx="11" ry="5" fill="#f7a21b"/>
   <ellipse cx="62" cy="110" rx="11" ry="5" fill="#f7a21b"/>
+  <g transform="rotate(14 58 20)">
+    <path d="M44 28 L58 -6 L72 28 Z" fill="#9b5de5"/>
+    <path d="M48 19 L68 19 M51 11 L65 11 M54 3 L62 3" stroke="#ffd23f" stroke-width="3"/>
+    <circle cx="58" cy="-7" r="5" fill="#f15bb5"/>
+  </g>
 </svg>`;
 
 // Penguin flopped on its back, proudly showing its feet
@@ -285,6 +290,52 @@ const Art = {
     ctx.beginPath(); ctx.ellipse(4, -7, 2, 2.6, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "#1b1f2e"; ctx.lineWidth = 1.8;
     ctx.beginPath(); ctx.arc(0, -3, 5, 0.2, Math.PI - 0.2); ctx.stroke();
+    ctx.restore();
+  },
+
+  // Birthday balloon on a string, tied to the back of the car, trailing behind
+  balloon(ctx, x, y, t, vx) {
+    const sway = Math.sin(t * 2.2) * 8 - (vx || 0) * 0.05;
+    const bx = x + 10 + sway, by = y + 52;
+    ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + sway * 0.3, y + 26, bx, by - 15); ctx.stroke();
+    ctx.fillStyle = "rgba(0,0,0,.18)";
+    ctx.beginPath(); ctx.ellipse(bx + 8, by + 8, 13, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f15bb5";
+    ctx.beginPath(); ctx.ellipse(bx, by, 13, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(bx - 3, by - 17); ctx.lineTo(bx + 3, by - 17); ctx.lineTo(bx, by - 13); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.55)";
+    ctx.beginPath(); ctx.ellipse(bx - 4, by - 5, 3.5, 5.5, -0.4, 0, Math.PI * 2); ctx.fill();
+  },
+
+  // The frat van: maroon, Greek letters on the roof, party lights
+  fratVan(ctx, x, y, t) {
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = "rgba(0,0,0,.25)";
+    this.rr(ctx, -25, -44, 54, 96, 10); ctx.fill();
+    ctx.fillStyle = "#7b1e3a";
+    this.rr(ctx, -27, -48, 54, 96, 10); ctx.fill();
+    ctx.fillStyle = "#1d2b3a";
+    this.rr(ctx, -21, -40, 42, 12, 4); ctx.fill();
+    ctx.fillStyle = "#f1e3c8";
+    this.rr(ctx, -21, -24, 42, 60, 6); ctx.fill();
+    ctx.fillStyle = "#7b1e3a";
+    ctx.font = "800 17px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("ΒΡΟ", 0, 6);
+    // headlights + flashing party light
+    ctx.fillStyle = "#fff6c2";
+    ctx.fillRect(-23, -48, 9, 4); ctx.fillRect(14, -48, 9, 4);
+    const flash = Math.floor(t * 6) % 2;
+    ctx.fillStyle = flash ? "#ff006e" : "#3a86ff";
+    ctx.beginPath(); ctx.arc(0, -30, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = flash ? "rgba(255,0,110,.25)" : "rgba(58,134,255,.25)";
+    ctx.beginPath(); ctx.arc(0, -30, 16, 0, Math.PI * 2); ctx.fill();
+    // music notes
+    ctx.fillStyle = "#ffd23f"; ctx.font = "700 16px sans-serif";
+    const n = (t * 1.5) % 1;
+    ctx.globalAlpha = 1 - n;
+    ctx.fillText("♪", -30 - n * 10, -20 - n * 30);
+    ctx.fillText("♫", 30 + n * 10, -10 - n * 30);
     ctx.restore();
   },
 

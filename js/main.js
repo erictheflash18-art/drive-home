@@ -6,6 +6,7 @@ const Game = {
   init() {
     $("title").textContent = LINES.title;
     $("subtitle").textContent = LINES.subtitle;
+    $("soundHint").textContent = LINES.soundHint;
     $("mascot").innerHTML = PENGUIN_SVG;
     document.querySelector(".feet-art").innerHTML = FEET_SVG;
     document.querySelector(".dialog-peng").innerHTML = PENGUIN_SVG;
@@ -52,6 +53,7 @@ const Game = {
     });
     ol.querySelectorAll(".play").forEach((b) => b.addEventListener("click", () => this.play(b.dataset.id)));
 
+    $("bday").textContent = birthdayText(now);
     const t = Save.totals();
     $("flowerTotal").textContent = t.flowers;
     $("toeTotal").textContent = t.toes;
@@ -65,6 +67,7 @@ const Game = {
 
   play(id) {
     Sfx.unlock();
+    Voice.preload();
     this.show("game");
     $("complete").classList.remove("show");
     Engine.resize();
@@ -80,17 +83,28 @@ const Game = {
     $("cBikes").textContent = d.bikesHit || 0;
     $("cCars").textContent = d.carsTotalled || 0;
     $("completeNote").textContent = d.note;
+    Voice.play(d.note, "interrupt");
     $("complete").classList.add("show");
   },
 
   toMap() {
     if (Engine.level && Engine.level.stop) Engine.level.stop();
+    Voice.stop();
     Engine.level = null;
     $("complete").classList.remove("show");
     this.show("map");
     this.renderMap();
   },
 };
+
+// Days until Nov 25 in Mountain time, counted by calendar day
+function birthdayText(now) {
+  const dayMs = 86400000;
+  const days = Math.ceil((BIRTHDAY - now) / dayMs);
+  if (now >= BIRTHDAY) return LINES.birthdayToday;
+  if (days <= 1) return LINES.birthdayTomorrow;
+  return LINES.birthdayCountdown.replace("{n}", days);
+}
 
 function countdown(ms) {
   if (ms <= 0) return "";

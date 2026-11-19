@@ -95,6 +95,7 @@ const Engine = {
     $("muteBtn").addEventListener("click", () => {
       Sfx.muted = !Sfx.muted;
       $("muteBtn").textContent = Sfx.muted ? "🔇" : "🔊";
+      if (Sfx.muted) Voice.stop();
     });
   },
 
@@ -111,9 +112,11 @@ const Engine = {
       this.dialogOpen = true;
       this.dialogShownAt = performance.now();
       this.input.left = this.input.right = false;
-      $("dialogText").textContent = this.dialogQueue.shift();
+      const first = this.dialogQueue.shift();
+      $("dialogText").textContent = first;
       $("dialog").classList.add("show");
       Sfx.blip();
+      Voice.play(first, "interrupt");
     });
   },
   advanceDialog() {
@@ -121,9 +124,11 @@ const Engine = {
     if (performance.now() - this.dialogShownAt < 350) return; // no accidental skipping
     Sfx.unlock();
     if (this.dialogQueue.length) {
-      $("dialogText").textContent = this.dialogQueue.shift();
+      const line = this.dialogQueue.shift();
+      $("dialogText").textContent = line;
       this.dialogShownAt = performance.now();
       Sfx.blip();
+      Voice.play(line, "interrupt");
       return;
     }
     $("dialog").classList.remove("show");
@@ -145,6 +150,7 @@ const Engine = {
     el.className = "toast " + (kind || "");
     el.textContent = text;
     box.appendChild(el);
+    Voice.play(text, "queue");
     while (box.children.length > 3) box.removeChild(box.firstChild);
     setTimeout(() => el.classList.add("out"), 3200);
     setTimeout(() => el.remove(), 3700);
@@ -154,6 +160,7 @@ const Engine = {
     const el = $("banner");
     el.textContent = text;
     el.classList.add("show");
+    Voice.play(text, "queue");
     clearTimeout(this.bannerT);
     if (ms) this.bannerT = setTimeout(() => el.classList.remove("show"), ms);
   },
@@ -161,6 +168,7 @@ const Engine = {
 
   showFeet(text) {
     $("feetText").textContent = text;
+    Voice.play(text, "interrupt");
     const el = $("feet");
     el.classList.remove("show"); void el.offsetWidth;
     el.classList.add("show");
