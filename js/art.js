@@ -211,6 +211,39 @@ const Art = {
     ctx.restore();
   },
 
+  // Little devil: red, horns, tiny pitchfork, wiggly tail
+  devil(ctx, x, y, t, flip, alpha) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(flip, 1);
+    ctx.globalAlpha = alpha;
+    ctx.rotate(Math.sin(t * 9) * 0.25);
+    // tail
+    ctx.strokeStyle = "#b5172b"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-6, 10); ctx.quadraticCurveTo(-20, 14 + Math.sin(t * 12) * 6, -22, 2); ctx.stroke();
+    ctx.fillStyle = "#b5172b";
+    ctx.beginPath(); ctx.moveTo(-22, -4); ctx.lineTo(-27, 5); ctx.lineTo(-17, 4); ctx.fill();
+    // pitchfork
+    ctx.strokeStyle = "#5c4033"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(12, 16); ctx.lineTo(16, -18); ctx.stroke();
+    ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(10, -16); ctx.lineTo(11, -24); ctx.moveTo(16, -18); ctx.lineTo(16.5, -27); ctx.moveTo(22, -18); ctx.lineTo(21.5, -26);
+    ctx.moveTo(10, -16); ctx.lineTo(22, -18); ctx.stroke();
+    // body + head
+    ctx.fillStyle = "#e63946";
+    ctx.beginPath(); ctx.ellipse(0, 8, 9, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -6, 11, 0, Math.PI * 2); ctx.fill();
+    // horns
+    ctx.fillStyle = "#fff3e0";
+    ctx.beginPath(); ctx.moveTo(-9, -12); ctx.lineTo(-12, -24); ctx.lineTo(-3, -15); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(9, -12); ctx.lineTo(12, -24); ctx.lineTo(3, -15); ctx.fill();
+    // face: mischievous
+    ctx.fillStyle = "#1b1f2e";
+    ctx.beginPath(); ctx.ellipse(-4, -7, 2, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(4, -7, 2, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#1b1f2e"; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(0, -3, 5, 0.2, Math.PI - 0.2); ctx.stroke();
+    ctx.restore();
+  },
+
   sign(ctx, x, y, text, side) {
     ctx.save(); ctx.translate(x, y);
     ctx.font = "700 12px 'Baloo 2', sans-serif";

@@ -24,7 +24,7 @@ const BoulderLevel = (() => {
       dist: 0, speed: 0, x: LANES[1], vx: 0, t: 0,
       state: "intro",          // intro | drive | snack | cutscene | done
       phase: 1,                // 1 = leaving, 2 = back to gas station, 3 = for real
-      objs: [], signs: [], floaters: [],
+      objs: [], signs: [], floaters: [], devils: [],
       flowers: 0, toes: 0, bikesHit: 0, carsTotalled: 0,
       invuln: 0, spinT: 0, spinDur: 0.7, boostT: 0, waterT: 0, flipT: 0,
       nextToe: 7, flags: {}, snickersMisses: 0,
@@ -36,14 +36,18 @@ const BoulderLevel = (() => {
       density: 0.25, gap: [300, 380],
       quiet: [[SNACK_AT - 450, SNACK_AT + 500], [GPS_AT - 150, GPS_AT + 1100]],
     });
-    L.signs.slice(0, 5).forEach((txt, i) => addSign(1300 + i * 1450, txt));
+    addSign(1300, L.signs[0]);
+    addSign(2750, L.devilsThumbSign, true);
+    addSign(4200, L.signs[1]);
+    addSign(5650, L.signs[2]);
+    addSign(7100, L.signs[3]);
     s.finishes.push({ e: FAKE_FINISH, label: "FINISH!", color: "#e63946" });
     updateHud();
   }
 
   // ---------- Level layout ----------
   function add(o) { o.active = false; o.v = o.v || 0; s.objs.push(o); return o; }
-  function addSign(e, text) { s.signs.push({ e, text }); }
+  function addSign(e, text, devils) { s.signs.push({ e, text, devils }); }
 
   function generate(from, to, opt) {
     let y = from + 550;
@@ -123,6 +127,7 @@ const BoulderLevel = (() => {
     s.x = clamp(s.x + s.vx * dt, BIKE_L - 20, BIKE_R + 20);
 
     if (s.state === "drive") events(dt);
+    updateDevils(dt);
     updateObjects(dt);
     updateHud();
   }
@@ -148,6 +153,36 @@ const BoulderLevel = (() => {
     }
     if (s.phase === 1 && s.dist >= FAKE_FINISH) fakeFinish();
     if (s.phase === 3 && s.dist >= s.p3End) realFinish();
+  }
+
+  // Driving under the Devil's Thumb sign lets the little devils out
+  function releaseDevils(sg) {
+    sg.released = true;
+    Sfx.devils();
+    Engine.toast(L.devils);
+    const P = py();
+    for (let i = 0; i < 8; i++) {
+      const fromLeft = i % 2 === 0;
+      s.devils.push({
+        x: fromLeft ? ROAD_L - 10 : ROAD_R + 10, y: P - 10 + rand(-20, 20),
+        vx: (fromLeft ? 1 : -1) * rand(40, 140), vy: rand(-220, -90),
+        t: -i * 0.12, life: rand(3.2, 4.2), flip: Math.random() < 0.5 ? 1 : -1,
+      });
+    }
+  }
+
+  function updateDevils(dt) {
+    for (const sg of s.signs) if (sg.devils && !sg.released && s.dist >= sg.e) releaseDevils(sg);
+    for (const d of s.devils) {
+      d.t += dt;
+      if (d.t < 0) continue;
+      d.x += d.vx * dt; d.y += d.vy * dt;
+      d.vy += 160 * dt; // floaty hops
+      if (d.y > py() + 20 && d.vy > 0) d.vy = -rand(160, 240); // bounce along beside the car
+      if (d.x < 20 || d.x > Engine.W - 20) d.vx *= -1;
+      d.y += s.speed * dt * 0.15; // drift back as you drive past
+    }
+    s.devils = s.devils.filter((d) => d.t < d.life);
   }
 
   function startToe(win) {
@@ -206,7 +241,7 @@ const BoulderLevel = (() => {
     });
     swarm(s.swarmAt - 100);
     addSign(s.p2Start + 500, L.backSign);
-    addSign(s.p2Start + 1900, L.signs[5]);
+    addSign(s.p2Start + 1900, L.signs[4]);
     s.gas = { e: s.p2End - 150 };
     placeSnickers(s.p2End, LANES[Math.floor(Math.random() * 3)]);
     s.phase = 2;
@@ -245,7 +280,7 @@ const BoulderLevel = (() => {
     s.p3End = s.dist + 2400;
     s.objs = s.objs.filter((o) => screenY(o) > py() + 40);
     generate(s.p3Start, s.p3End - 400, { density: 0.2, gap: [300, 360] });
-    addSign(s.p3Start + 600, L.signs[6]);
+    addSign(s.p3Start + 600, L.signs[5]);
     s.finishes.push({ e: s.p3End, label: L.finalSign, color: "#1e7a46" });
     s.state = "drive";
     s.nextToe = rand(6, 9);
@@ -483,6 +518,13 @@ const BoulderLevel = (() => {
       ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; Art.rr(ctx, ROAD_L - 4, y - h / 2 + 4, ROAD_R - ROAD_L + 8, h - 8, 6); ctx.stroke();
       ctx.fillStyle = "#fff";
       lines.forEach((l, i) => ctx.fillText(l, W / 2, y - h / 2 + 18 + i * 18));
+    }
+
+    // little devils
+    for (const d of s.devils) {
+      if (d.t < 0) continue;
+      const fade = Math.min(1, (d.life - d.t) * 2, d.t * 4);
+      Art.devil(ctx, d.x, d.y, s.t + d.life, d.flip, fade);
     }
 
     // floating "-1" text

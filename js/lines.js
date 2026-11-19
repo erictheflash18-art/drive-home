@@ -6,7 +6,7 @@
 
 const LINES = {
   title: "You really thought you weren't gonna have to drive home again",
-  subtitle: "Boulder → Durango. One leg a day. Don't forget to hook the toe.",
+  subtitle: "Boulder → Durango. Don't forget to hook the toe.",
 
   // Shown under each stop on the map before it opens
   lockedText: "YO JOHN, not yet. Opens",
@@ -54,18 +54,19 @@ const LINES = {
     intro: [
       "YO JOHN, it's time to drive home to Durango.",
       "Steer with the arrow keys (or the buttons on your phone). Grab the chrysanthemums. Don't hit the bikes. Boulder has a LOT of bikes.",
-      "Kombucha makes you go fast. Puddles from Boulder Creek are wet. You know how you feel about wet.",
+      "Kombucha makes you go fast. And avoid the puddles, because the water is cold.",
       "And if you see HOOK THE TOE... hook the toe. (Tap it, or hit Space.)",
     ],
     signs: [
       "YO JOHN, Pearl St →",
-      "Flatirons: still pointy",
       "Subaru count: 47",
       "YO JOHN, bike lane = bike land",
       "Kombucha 2 mi",
       "YO JOHN, the prairie dogs are watching",
       "Subaru count: 112",
     ],
+    devilsThumbSign: "YO JOHN, Devil's Thumb ↑",
+    devils: "YO JOHN, the Devil's Thumb sent some friends.",
     boost: "YO JOHN, KOMBUCHA POWER!",
     snackBreak: "YO JOHN, hold on. Snack break. *munch munch munch*",
     snackDone: "...that was the last Snickers. Anyway.",
