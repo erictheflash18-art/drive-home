@@ -9,6 +9,7 @@ const Game = {
     $("mascot").innerHTML = PENGUIN_SVG;
     document.querySelector(".feet-art").innerHTML = FEET_SVG;
     document.querySelector(".dialog-peng").innerHTML = PENGUIN_SVG;
+    document.querySelector(".cut-art").innerHTML = SNACK_SVG;
     $("toeBtn").querySelector("span").textContent = LINES.toePrompt;
     $("completeBtn").addEventListener("click", () => this.toMap());
     $("quitBtn").addEventListener("click", () => this.toMap());

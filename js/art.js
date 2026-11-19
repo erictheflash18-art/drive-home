@@ -37,6 +37,50 @@ const FEET_SVG = `
   </g>
 </svg>`;
 
+// Snack-break cutscene: the penguin in the car, eating a Snickers bite by bite
+const SNACK_SVG = `
+<svg viewBox="0 0 320 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="snackWin"><path d="M112 70 Q114 64 122 64 L210 64 Q220 64 224 72 L244 124 L96 124 Z"/></clipPath>
+  </defs>
+  <rect width="320" height="240" rx="24" fill="#8ecae6"/>
+  <path d="M0 160 L55 96 L105 146 L168 74 L228 140 L276 100 L320 136 L320 240 L0 240Z" fill="#6c8ebf"/>
+  <path d="M168 74 L182 90 L172 88 L164 94 L156 88Z M55 96 L66 109 L55 106 L46 110Z" fill="#fff"/>
+  <rect y="196" width="320" height="44" fill="#3d4452"/>
+  <rect x="20" y="214" width="40" height="6" fill="#fff" opacity=".7"/><rect x="140" y="214" width="40" height="6" fill="#fff" opacity=".7"/><rect x="260" y="214" width="40" height="6" fill="#fff" opacity=".7"/>
+  <path d="M30 150 Q30 128 52 126 L84 126 L104 66 Q108 56 120 56 L214 56 Q228 56 234 68 L258 126 L280 128 Q296 130 296 150 L296 186 Q296 196 286 196 L40 196 Q30 196 30 186 Z" fill="#2ec4b6"/>
+  <path d="M112 70 Q114 64 122 64 L210 64 Q220 64 224 72 L244 124 L96 124 Z" fill="#bde8ff"/>
+  <g clip-path="url(#snackWin)">
+    <g class="head">
+      <ellipse cx="160" cy="138" rx="40" ry="46" fill="#1b1f2e"/>
+      <ellipse cx="160" cy="146" rx="26" ry="32" fill="#fff"/>
+      <ellipse cx="164" cy="100" rx="24" ry="17" fill="#fff"/>
+      <path d="M152 96 q4 -6 8 0" stroke="#1b1f2e" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M170 96 q4 -6 8 0" stroke="#1b1f2e" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <circle cx="150" cy="106" r="4" fill="#ff8fa3" opacity=".8"/>
+      <path d="M134 84 Q160 70 188 82 L186 89 Q160 78 136 91 Z" fill="#e63946"/>
+      <path class="jaw" d="M176 106 L196 107 L176 113 Z" fill="#d98a10"/>
+      <path d="M176 99 L200 104 L176 107 Z" fill="#f7a21b"/>
+    </g>
+    <g class="bar">
+      <rect x="190" y="98" width="50" height="15" rx="3" fill="#5a3518"/>
+      <rect x="190" y="98" width="50" height="4" rx="2" fill="#7a4a24"/>
+      <text x="215" y="109.5" font-size="8" font-weight="800" fill="#fff" text-anchor="middle" font-family="sans-serif">SNICKERS</text>
+    </g>
+    <ellipse cx="214" cy="120" rx="18" ry="7" fill="#1b1f2e" transform="rotate(-20 214 120)"/>
+  </g>
+  <circle class="crumb" cx="196" cy="110" r="2.5" fill="#7a4a24" style="--dx:18px;--dy:-16px"/>
+  <circle class="crumb" cx="196" cy="110" r="2" fill="#c08a52" style="--dx:-6px;--dy:22px;animation-delay:.15s"/>
+  <circle class="crumb" cx="196" cy="110" r="2.5" fill="#7a4a24" style="--dx:24px;--dy:10px;animation-delay:.3s"/>
+  <circle class="crumb" cx="196" cy="110" r="2" fill="#c08a52" style="--dx:6px;--dy:-24px;animation-delay:.42s"/>
+  <circle cx="92" cy="196" r="22" fill="#1b1f2e"/><circle cx="92" cy="196" r="9" fill="#adb5bd"/>
+  <circle cx="238" cy="196" r="22" fill="#1b1f2e"/><circle cx="238" cy="196" r="9" fill="#adb5bd"/>
+  <text class="munch m1" x="40" y="44">MUNCH</text>
+  <text class="munch m2" x="200" y="36">munch</text>
+  <text class="munch m3" x="56" y="100">MUNCH</text>
+  <text class="munch m4" x="214" y="160">*chomp*</text>
+</svg>`;
+
 const Art = {
   rr(ctx, x, y, w, h, r) {
     ctx.beginPath();
@@ -171,10 +215,10 @@ const Art = {
     ctx.restore();
   },
 
-  puddle(ctx, x, y, w, t) {
+  puddle(ctx, x, y, w, t, h) {
     ctx.save(); ctx.translate(x, y);
     ctx.fillStyle = "#4ea8de";
-    ctx.beginPath(); ctx.ellipse(0, 0, w / 2, 20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 0, w / 2, (h || 40) / 2, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#90e0ef";
     ctx.beginPath(); ctx.ellipse(-w * 0.12, -5, w * 0.25, 6, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,.6)"; ctx.lineWidth = 2;

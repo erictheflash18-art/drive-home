@@ -11,6 +11,7 @@ const BoulderLevel = (() => {
   const FAKE_FINISH = 7700;
   const SNACK_AT = 4300;
   const GPS_AT = 6400;
+  const FLOOD_AT = 5250;        // the puddle you can't avoid
   const CAR_COLORS = ["#e76f51", "#457b9d", "#f4a261", "#8d99ae", "#6a4c93", "#d62828", "#f1faee"];
   const RIDER_COLORS = ["#ff006e", "#3a86ff", "#8338ec", "#fb5607", "#06d6a0"];
 
@@ -25,7 +26,7 @@ const BoulderLevel = (() => {
       state: "intro",          // intro | drive | snack | cutscene | done
       phase: 1,                // 1 = leaving, 2 = back to gas station, 3 = for real
       objs: [], signs: [], floaters: [], devils: [],
-      flowers: 0, toes: 0, bikesHit: 0, carsTotalled: 0,
+      flowers: 0, toes: 0, bikesHit: 0, carsTotalled: 0, zoom: 1, shrinkT: 0, smallPending: false,
       invuln: 0, spinT: 0, spinDur: 0.7, boostT: 0, waterT: 0, flipT: 0,
       nextToe: 7, flags: {}, snickersMisses: 0,
       p2Start: 0, p2End: 0, p3Start: 0, p3End: 0,
@@ -34,11 +35,13 @@ const BoulderLevel = (() => {
     Confetti.bits = [];
     generate(0, FAKE_FINISH - 300, {
       density: 0.25, gap: [300, 380],
-      quiet: [[SNACK_AT - 450, SNACK_AT + 500], [GPS_AT - 150, GPS_AT + 1100]],
+      quiet: [[SNACK_AT - 450, SNACK_AT + 500], [FLOOD_AT - 350, FLOOD_AT + 250], [GPS_AT - 150, GPS_AT + 1100]],
     });
     addSign(1300, L.signs[0]);
     addSign(2750, L.devilsThumbSign, true);
     addSign(4200, L.signs[1]);
+    addSign(4950, L.floodSign);
+    add({ type: "puddle", e: FLOOD_AT, x: (BIKE_L + BIKE_R) / 2, w: BIKE_R - BIKE_L + 80, h: 70, forced: true });
     addSign(5650, L.signs[2]);
     addSign(7100, L.signs[3]);
     s.finishes.push({ e: FAKE_FINISH, label: "FINISH!", color: "#e63946" });
@@ -112,6 +115,13 @@ const BoulderLevel = (() => {
       if (s.boostT <= 0) Engine.toast(pick(LINES.doesntLastLong));
     }
     s.waterT = Math.max(0, s.waterT - dt);
+    s.shrinkT = Math.max(0, s.shrinkT - dt);
+    const zTarget = s.shrinkT > 0 ? 0.5 : 1;
+    s.zoom += (zTarget - s.zoom) * Math.min(1, dt * (s.shrinkT > 0 ? 6 : 3));
+    if (s.smallPending && s.zoom < 0.62) {
+      s.smallPending = false;
+      Engine.toast(pick(LINES.gotSmall), "water");
+    }
     s.invuln = Math.max(0, s.invuln - dt);
     s.spinT = Math.max(0, s.spinT - dt);
     if (s.flipT > 0) {
@@ -197,15 +207,21 @@ const BoulderLevel = (() => {
     s.flags.snack = true;
     ToePrompt.cancel();
     s.state = "snack";
-    Engine.toast(L.snackBreak);
-    await wait(700);
+    await wait(700); // pull over
     if (me.dead) return;
+    const cut = $("snack");
+    $("snackText").textContent = L.snackBreak;
+    cut.classList.remove("show"); void cut.offsetWidth; // restart the animations
+    cut.classList.add("show");
     Sfx.munch();
-    s.munching = true;
-    await wait(2300);
+    setTimeout(() => Sfx.munch(), 1200);
+    setTimeout(() => Sfx.munch(), 2400);
+    await wait(3600);
     if (me.dead) return;
-    s.munching = false;
-    Engine.toast(L.snackDone);
+    $("snackText").textContent = L.snackDone;
+    await wait(1800);
+    if (me.dead) return;
+    cut.classList.remove("show");
     if (s.state === "snack") s.state = "drive";
   }
 
@@ -338,7 +354,7 @@ const BoulderLevel = (() => {
       if (!o.active) {
         const rel = o.e - s.dist;
         const factor = o.v ? 1 - o.v / BASE : 1;
-        if (rel * factor < P + 90) {
+        if (rel * factor < P / s.zoom + 90) {
           o.active = true;
           o.wy = o.v ? o.e - o.v * rel / BASE : o.e;
         } else continue;
@@ -376,7 +392,7 @@ const BoulderLevel = (() => {
       delete o.wy;
       o.x = s.snickersMisses >= 2 ? clamp(s.x, LANES[0], LANES[2]) : LANES[Math.floor(Math.random() * 3)];
     }
-    s.objs = s.objs.filter((o) => !o.active || screenY(o) < Engine.H + 140);
+    s.objs = s.objs.filter((o) => !o.active || screenY(o) < P + (Engine.H - P) / s.zoom + 140);
   }
 
   function hitbox(o) {
@@ -385,7 +401,7 @@ const BoulderLevel = (() => {
       case "bike": return { x: o.x, hw: 8, hh: 16 };
       case "cone": return { x: o.x, hw: 10, hh: 10 };
       case "dog": return { x: o.x, hw: 11, hh: 7 };
-      case "puddle": return { x: o.x, hw: o.w / 2 - 10, hh: 14 };
+      case "puddle": return { x: o.x, hw: o.w / 2 - 10, hh: (o.h || 40) / 2 - 6 };
       case "flower": return { x: o.x, hw: 18, hh: 18 };
       case "kombucha": return { x: o.x, hw: 16, hh: 16 };
       case "snickers": return { x: o.x, hw: 32, hh: 22 };
@@ -400,8 +416,12 @@ const BoulderLevel = (() => {
       o.collected = true; s.boostT = 2; Sfx.boost(); Engine.toast(L.boost, "good");
     } else if (o.type === "puddle") {
       o.hit = true;
-      if (s.boostT <= 0) {
-        s.waterT = 1.3; Sfx.splash(); Engine.toast(pick(LINES.waterCold), "water");
+      if (s.boostT <= 0 || o.forced) {
+        s.waterT = 1.3; Sfx.splash();
+        if (o.forced) Engine.toast(L.flood, "water");
+        Engine.toast(pick(LINES.waterCold), "water");
+        s.shrinkT = 3.4;          // everything gets small
+        s.smallPending = true;
       }
     } else if (o.type === "snickers") {
       o.collected = true;
@@ -416,17 +436,22 @@ const BoulderLevel = (() => {
     const W = Engine.W, H = Engine.H, P = py();
     ctx.save();
     if (Engine.shake) ctx.translate(rand(-1, 1) * Engine.shake, rand(-1, 1) * Engine.shake);
+    // THE WATER IS COLD → everything shrinks around the car
+    const k = s.zoom;
+    ctx.translate(W / 2, P); ctx.scale(k, k); ctx.translate(-W / 2, -P);
+    const top = P - P / k - 30, bot = P + (H - P) / k + 30, tall = bot - top;
+    const left = W / 2 - W / 2 / k - 30;
 
     // grass + road
-    ctx.fillStyle = "#74c69d"; ctx.fillRect(-20, -20, W + 40, H + 40);
-    ctx.fillStyle = "#c9c9c9"; ctx.fillRect(64, -20, 12, H + 40); ctx.fillRect(W - 76, -20, 12, H + 40);
-    ctx.fillStyle = "#3d4452"; ctx.fillRect(74, -20, W - 148, H + 40);
-    ctx.fillStyle = "#4b6b52"; ctx.fillRect(74, -20, 26, H + 40); ctx.fillRect(ROAD_R, -20, 26, H + 40);
-    ctx.fillStyle = "#fff"; ctx.fillRect(ROAD_L - 2, -20, 3, H + 40); ctx.fillRect(ROAD_R - 1, -20, 3, H + 40);
+    ctx.fillStyle = "#74c69d"; ctx.fillRect(left, top, W / k + 60, tall);
+    ctx.fillStyle = "#c9c9c9"; ctx.fillRect(64, top, 12, tall); ctx.fillRect(W - 76, top, 12, tall);
+    ctx.fillStyle = "#3d4452"; ctx.fillRect(74, top, W - 148, tall);
+    ctx.fillStyle = "#4b6b52"; ctx.fillRect(74, top, 26, tall); ctx.fillRect(ROAD_R, top, 26, tall);
+    ctx.fillStyle = "#fff"; ctx.fillRect(ROAD_L - 2, top, 3, tall); ctx.fillRect(ROAD_R - 1, top, 3, tall);
 
     // lane dashes + bike symbols (world-fixed so they scroll)
-    const first = Math.floor((s.dist - (H - P) - 80) / 70);
-    const last = Math.floor((s.dist + P + 80) / 70);
+    const first = Math.floor((s.dist - (bot - P) - 80) / 70);
+    const last = Math.floor((s.dist + (P - top) + 80) / 70);
     ctx.fillStyle = "#f8f9fa";
     for (let i = first; i <= last; i++) {
       const y = P - (i * 70 - s.dist);
@@ -442,7 +467,7 @@ const BoulderLevel = (() => {
     ctx.globalAlpha = 1;
 
     // scenery on the grass
-    const f2 = Math.floor((s.dist - (H - P) - 150) / 110), l2 = Math.floor((s.dist + P + 150) / 110);
+    const f2 = Math.floor((s.dist - (bot - P) - 150) / 110), l2 = Math.floor((s.dist + (P - top) + 150) / 110);
     for (let i = f2; i <= l2; i++) {
       const y = P - (i * 110 - s.dist);
       const a = hash(i, 1), b = hash(i, 2);
@@ -454,7 +479,7 @@ const BoulderLevel = (() => {
 
     if (s.gas) {
       const gy = P - (s.gas.e - s.dist);
-      if (gy > -100 && gy < H + 100) Art.gasStation(ctx, W - 20, gy);
+      if (gy > top - 100 && gy < bot + 100) Art.gasStation(ctx, W - 20, gy);
     }
 
     // objects, layered: ground stuff first
@@ -462,7 +487,7 @@ const BoulderLevel = (() => {
     const vis = s.objs.filter((o) => o.active && !o.collected).sort((a, b) => order[a.type] - order[b.type]);
     for (const o of vis) {
       let y = screenY(o);
-      if (y < -80 || y > H + 80) continue;
+      if (y < top - 60 || y > bot + 60) continue;
       ctx.save();
       if (o.fly) {
         ctx.globalAlpha = Math.max(0, 2 - o.fly);
@@ -476,7 +501,7 @@ const BoulderLevel = (() => {
           break;
         case "cone": Art.cone(ctx, o.x, y); break;
         case "dog": Art.prairieDog(ctx, o.x, y, o.dir, s.t); break;
-        case "puddle": Art.puddle(ctx, o.x, y, o.w, s.t); break;
+        case "puddle": Art.puddle(ctx, o.x, y, o.w, s.t, o.h); break;
         case "flower": Art.flower(ctx, o.x, y, s.t, o.hue); break;
         case "kombucha": Art.kombucha(ctx, o.x, y, s.t); break;
         case "snickers": Art.snickers(ctx, o.x, y, s.t); break;
@@ -487,7 +512,7 @@ const BoulderLevel = (() => {
     // finish lines
     for (const f of s.finishes) {
       const y = P - (f.e - s.dist);
-      if (y > -60 && y < H + 60) Art.finishLine(ctx, ROAD_L - 26, ROAD_R + 26, y, f.label, f.color);
+      if (y > top - 60 && y < bot + 60) Art.finishLine(ctx, ROAD_L - 26, ROAD_R + 26, y, f.label, f.color);
     }
 
     // the penguin
@@ -508,7 +533,7 @@ const BoulderLevel = (() => {
     // overhead highway signs
     for (const sg of s.signs) {
       const y = P - (sg.e - s.dist);
-      if (y < -120 || y > H + 120) continue;
+      if (y < top - 120 || y > bot + 120) continue;
       ctx.font = "700 16px 'Baloo 2', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const lines = Art.wrap(ctx, sg.text, 200);
       const h = 18 + lines.length * 18;
@@ -536,6 +561,9 @@ const BoulderLevel = (() => {
       ctx.fillStyle = "#e63946"; ctx.fillText(f.text, f.x, f.y);
       ctx.globalAlpha = 1;
     }
+
+    // back to normal size for the screen effects
+    ctx.translate(W / 2, P); ctx.scale(1 / k, 1 / k); ctx.translate(-W / 2, -P);
 
     // cold water tint
     if (s.waterT > 0) {

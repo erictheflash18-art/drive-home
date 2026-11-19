@@ -23,10 +23,7 @@ const LINES = {
   // Hook the toe
   toePrompt: "HOOK THE TOE",
   toeSuccess: [
-    "TOE HOOKED.",
-    "YO JOHN, beautiful toes.",
-    "YO JOHN, that's a clean hook.",
-    "TOE: HOOKED. CRISIS: AVERTED.",
+    "HOW DOES THAT WORK",
   ],
   toeFail: [
     "YO JOHN, the toe went unhooked.",
@@ -44,8 +41,13 @@ const LINES = {
   // Driving through a puddle (she hates the water)
   waterCold: [
     "YO JOHN, THE WATER IS COLD.",
-    "YO JOHN, the water is SO cold.",
-    "YO JOHN, cold water. Cold. Water.",
+    "YO JOHN, THE WATER IS SO COLD.",
+    "YO JOHN, COLD WATER. COLD. WATER.",
+  ],
+
+  // Shown a moment after the water shrinks everything
+  gotSmall: [
+    "DAMN, THAT GOT SMALL.",
   ],
 
   // ---------------- LEVEL 1: BOULDER ----------------
@@ -54,7 +56,7 @@ const LINES = {
     intro: [
       "YO JOHN, it's time to drive home to Durango.",
       "Steer with the arrow keys (or the buttons on your phone). Grab the chrysanthemums. Don't hit the bikes. Boulder has a LOT of bikes.",
-      "Kombucha makes you go fast. And avoid the puddles, because the water is cold.",
+      "Kombucha makes you go fast. And avoid the puddles, because THE WATER IS COLD.",
       "And if you see HOOK THE TOE... hook the toe. (Tap it, or hit Space.)",
     ],
     signs: [
@@ -68,7 +70,9 @@ const LINES = {
     devilsThumbSign: "YO JOHN, Devil's Thumb ↑",
     devils: "YO JOHN, the Devil's Thumb sent some friends.",
     boost: "YO JOHN, KOMBUCHA POWER!",
-    snackBreak: "YO JOHN, hold on. Snack break. *munch munch munch*",
+    floodSign: "YO JOHN, Boulder Creek flooding ahead",
+    flood: "YO JOHN, no way around this one.",
+    snackBreak: "YO JOHN, hold on. Snack break.",
     snackDone: "...that was the last Snickers. Anyway.",
     gpsWarning: "YO JOHN, GPS RECALCULATING — CONTROLS FLIPPED",
     fakeComplete: "LEVEL COMPLETE!",
