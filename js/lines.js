@@ -5,7 +5,7 @@
 // ============================================================
 
 const LINES = {
-  title: "YO JOHN, DRIVE HOME",
+  title: "You really thought you weren't gonna have to drive home again",
   subtitle: "Boulder → Durango. One leg a day. Don't forget to hook the toe.",
 
   // Shown under each stop on the map before it opens

@@ -54,6 +54,8 @@ const Game = {
     const t = Save.totals();
     $("flowerTotal").textContent = t.flowers;
     $("toeTotal").textContent = t.toes;
+    $("bikeTotal").textContent = Save.stat("bikesHit");
+    $("carTotal").textContent = Save.stat("carsTotalled");
     $("bracelet").innerHTML = STOPS.map((st) => {
       const has = Save.data.levels[st.id] && Save.data.levels[st.id].charm;
       return `<span class="charm ${has ? "has" : ""}" title="${st.charmName}">${has ? st.charm : ""}</span>`;
@@ -74,6 +76,8 @@ const Game = {
     $("cFlowers").textContent = d.flowers;
     $("cToes").textContent = d.toes;
     $("cCharm").textContent = d.charm;
+    $("cBikes").textContent = d.bikesHit || 0;
+    $("cCars").textContent = d.carsTotalled || 0;
     $("completeNote").textContent = d.note;
     $("complete").classList.add("show");
   },

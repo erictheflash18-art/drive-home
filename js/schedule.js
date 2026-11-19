@@ -40,6 +40,13 @@ const Save = {
     else prev.toes = Math.max(prev.toes, result.toes);
     this.write();
   },
+  // lifetime counters (replays count too — every bike is remembered)
+  bump(key) {
+    this.data.stats = this.data.stats || {};
+    this.data.stats[key] = (this.data.stats[key] || 0) + 1;
+    this.write();
+  },
+  stat(key) { return (this.data.stats && this.data.stats[key]) || 0; },
   totals() {
     let flowers = 0, toes = 0;
     for (const k in this.data.levels) {

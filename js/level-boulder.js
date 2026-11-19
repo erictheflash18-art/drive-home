@@ -7,8 +7,8 @@ const BoulderLevel = (() => {
   const ROAD_L = 100, ROAD_R = 340, LANE_W = 80;
   const LANES = [140, 220, 300];
   const BIKE_L = 86, BIKE_R = 354;
-  const BASE = 270;           // cruising speed
-  const FAKE_FINISH = 8600;
+  const BASE = 215;           // cruising speed (slow enough to read the signs)
+  const FAKE_FINISH = 7700;
   const SNACK_AT = 4300;
   const GPS_AT = 6400;
   const CAR_COLORS = ["#e76f51", "#457b9d", "#f4a261", "#8d99ae", "#6a4c93", "#d62828", "#f1faee"];
@@ -25,7 +25,7 @@ const BoulderLevel = (() => {
       state: "intro",          // intro | drive | snack | cutscene | done
       phase: 1,                // 1 = leaving, 2 = back to gas station, 3 = for real
       objs: [], signs: [], floaters: [],
-      flowers: 0, toes: 0,
+      flowers: 0, toes: 0, bikesHit: 0, carsTotalled: 0,
       invuln: 0, spinT: 0, spinDur: 0.7, boostT: 0, waterT: 0, flipT: 0,
       nextToe: 7, flags: {}, snickersMisses: 0,
       p2Start: 0, p2End: 0, p3Start: 0, p3End: 0,
@@ -58,7 +58,7 @@ const BoulderLevel = (() => {
       const k = Math.random() < opt.density ? 2 : 1;
       for (let i = 0; i < k; i++) {
         const ln = lanes[i], r = Math.random();
-        if (r < 0.5) add({ type: "car", e: y, x: LANES[ln], v: rand(130, 170), color: pick(CAR_COLORS), subaru: Math.random() < 0.4 });
+        if (r < 0.5) add({ type: "car", e: y, x: LANES[ln], v: rand(100, 135), color: pick(CAR_COLORS), subaru: Math.random() < 0.4 });
         else if (r < 0.78) add({ type: "cone", e: y, x: LANES[ln] + rand(-12, 12) });
         else add({ type: "puddle", e: y, x: LANES[ln], w: 70 });
       }
@@ -69,7 +69,7 @@ const BoulderLevel = (() => {
       if (Math.random() < 0.45) {
         const left = Math.random() < 0.5;
         add({ type: "bike", e: y + 120, x: left ? BIKE_L : BIKE_R, base: left ? BIKE_L : BIKE_R, dir: left ? 1 : -1,
-          v: 110, color: pick(RIDER_COLORS), swerve: Math.random() < 0.35, sw: 0 });
+          v: 88, color: pick(RIDER_COLORS), swerve: Math.random() < 0.35, sw: 0 });
       }
       if (Math.random() < 0.12) {
         const dir = Math.random() < 0.5 ? 1 : -1;
@@ -91,13 +91,13 @@ const BoulderLevel = (() => {
     s.t += dt;
     Confetti.update(dt, Engine.H);
     ToePrompt.update(dt);
-    for (const f of s.floaters) { f.t += dt; f.y -= 40 * dt; }
-    s.floaters = s.floaters.filter((f) => f.t < 1.1);
+    for (const f of s.floaters) { f.t += dt; f.y -= 30 * dt; }
+    s.floaters = s.floaters.filter((f) => f.t < 1.8);
     Engine.shake = Math.max(0, Engine.shake - dt * 30);
 
     // speed
     let target = 0;
-    if (s.state === "drive") target = s.boostT > 0 ? 440 : s.waterT > 0 ? 150 : BASE;
+    if (s.state === "drive") target = s.boostT > 0 ? 360 : s.waterT > 0 ? 120 : BASE;
     if (s.speed < target) s.speed = Math.min(target, s.speed + 260 * dt);
     else s.speed = Math.max(target, s.speed - 520 * dt);
     s.dist += s.speed * dt;
@@ -198,8 +198,8 @@ const BoulderLevel = (() => {
     s.objs = s.objs.filter((o) => screenY(o) > py() + 40);
     s.finishes = [];
     s.p2Start = s.dist;
-    s.p2End = s.dist + 5400;
-    s.swarmAt = s.p2Start + 2700;
+    s.p2End = s.dist + 4800;
+    s.swarmAt = s.p2Start + 2400;
     generate(s.p2Start, s.p2End - 500, {
       density: 0.5, gap: [240, 300],
       quiet: [[s.swarmAt - 200, s.swarmAt + 700]],
@@ -221,7 +221,7 @@ const BoulderLevel = (() => {
     pattern.forEach((blocked, i) => {
       const row = y + i * 170;
       blocked.forEach((ln) => add({ type: i % 2 ? "cone" : "bike", e: row, x: LANES[ln], base: LANES[ln], dir: 1,
-        v: i % 2 ? 0 : 80, color: pick(RIDER_COLORS), swerve: false, sw: 0 }));
+        v: i % 2 ? 0 : 64, color: pick(RIDER_COLORS), swerve: false, sw: 0 }));
       const free = [0, 1, 2].find((l) => !blocked.includes(l));
       add({ type: "flower", e: row, x: LANES[free], hue: i % 3 });
     });
@@ -242,7 +242,7 @@ const BoulderLevel = (() => {
     if (me.dead) return;
     s.phase = 3;
     s.p3Start = s.dist;
-    s.p3End = s.dist + 2800;
+    s.p3End = s.dist + 2400;
     s.objs = s.objs.filter((o) => screenY(o) > py() + 40);
     generate(s.p3Start, s.p3End - 400, { density: 0.2, gap: [300, 360] });
     addSign(s.p3Start + 600, L.signs[6]);
@@ -264,6 +264,7 @@ const BoulderLevel = (() => {
     Game.showComplete({
       title: "YO JOHN, BOULDER: DONE. (For real this time.)",
       flowers: s.flowers, toes: s.toes, charm: "🍫", charmName: "Snickers",
+      bikesHit: s.bikesHit, carsTotalled: s.carsTotalled,
       note: L.note,
     });
   }
@@ -278,10 +279,19 @@ const BoulderLevel = (() => {
     Sfx.crash();
     Engine.shake = 10;
     s.invuln = 1.4;
-    s.speed = 90;
+    s.speed = 75;
     if (s.flowers > 0) {
       s.flowers--;
       s.floaters.push({ x: s.x, y: py() - 40, text: "-1 🌼", t: 0 });
+    }
+    if (o.type === "bike") {
+      s.bikesHit++;
+      Save.bump("bikesHit");
+      s.floaters.push({ x: s.x, y: py() - 70, text: "BIKES HIT: " + s.bikesHit, t: 0 });
+    } else if (o.type === "car") {
+      s.carsTotalled++;
+      Save.bump("carsTotalled");
+      s.floaters.push({ x: s.x, y: py() - 70, text: "CARS TOTALLED: " + s.carsTotalled, t: 0 });
     }
     Engine.toast(pick(LINES.crash), "bad");
   }
@@ -477,9 +487,11 @@ const BoulderLevel = (() => {
 
     // floating "-1" text
     for (const f of s.floaters) {
-      ctx.globalAlpha = 1 - f.t / 1.1;
-      ctx.fillStyle = "#e63946"; ctx.font = "800 20px 'Baloo 2', sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(f.text, f.x, f.y);
+      ctx.globalAlpha = Math.min(1, (1.8 - f.t) * 2);
+      ctx.font = "800 20px 'Baloo 2', sans-serif"; ctx.textAlign = "center";
+      ctx.lineWidth = 5; ctx.strokeStyle = "#fff"; ctx.lineJoin = "round";
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.fillStyle = "#e63946"; ctx.fillText(f.text, f.x, f.y);
       ctx.globalAlpha = 1;
     }
 

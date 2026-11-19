@@ -146,8 +146,8 @@ const Engine = {
     el.textContent = text;
     box.appendChild(el);
     while (box.children.length > 3) box.removeChild(box.firstChild);
-    setTimeout(() => el.classList.add("out"), 1900);
-    setTimeout(() => el.remove(), 2400);
+    setTimeout(() => el.classList.add("out"), 3200);
+    setTimeout(() => el.remove(), 3700);
   },
 
   banner(text, ms) {
