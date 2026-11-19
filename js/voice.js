@@ -16,21 +16,23 @@ const Voice = {
   current: null,
   queue: [],
 
-  // [{ key, text, section }] in the order they appear in lines.js
-  allLines() {
+  // [{ key, text, section, voiced }] in the order they appear in lines.js.
+  // includeLabels also returns text-only lines (signs, title...) with voiced: false.
+  allLines(includeLabels) {
     const out = [];
-    const walk = (node, path, section) => {
-      if (typeof node === "string") { out.push({ key: path.join("."), text: node, section }); return; }
-      if (Array.isArray(node)) { node.forEach((v, i) => walk(v, path.concat(i), section)); return; }
+    const walk = (node, path, section, voiced) => {
+      if (typeof node === "string") { out.push({ key: path.join("."), text: node, section, voiced }); return; }
+      if (Array.isArray(node)) { node.forEach((v, i) => walk(v, path.concat(i), section, voiced)); return; }
       if (node && typeof node === "object") {
         for (const k of Object.keys(node)) {
-          if (VOICE_SKIP.has(k)) continue;
+          const skip = VOICE_SKIP.has(k);
+          if (skip && !includeLabels) continue;
           const sec = path.length === 0 && typeof node[k] === "object" && !Array.isArray(node[k]) ? k : section;
-          walk(node[k], path.concat(k), sec);
+          walk(node[k], path.concat(k), sec, voiced && !skip);
         }
       }
     };
-    walk(LINES, [], "general");
+    walk(LINES, [], "general", true);
     return out;
   },
 

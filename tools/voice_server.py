@@ -20,6 +20,8 @@ import urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AUDIO = os.path.join(ROOT, "audio")
+LINES_JS = os.path.join(ROOT, "js", "lines.js")
+TEXTS = os.path.join(AUDIO, "texts.json")  # the words each take was recorded with
 KEY_RE = re.compile(r"^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$")
 EXTS = (".m4a", ".wav")
 
@@ -39,6 +41,35 @@ def write_manifest():
     with open(os.path.join(AUDIO, "manifest.js"), "w") as f:
         f.write("// Written by tools/voice_server.py: which lines have a recording.\n")
         f.write(f"const VOICE_CLIPS = {data};\n")
+
+
+def read_texts():
+    try:
+        with open(TEXTS) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def write_texts(texts):
+    with open(TEXTS, "w") as f:
+        json.dump(texts, f, indent=1, ensure_ascii=False, sort_keys=True)
+
+
+def replace_line(old, new):
+    """Swap one string literal in lines.js. Refuses if it isn't found exactly once."""
+    with open(LINES_JS, encoding="utf-8") as f:
+        src = f.read()
+    old_lit = json.dumps(old, ensure_ascii=False)
+    count = src.count(old_lit)
+    if count != 1:
+        return f"Found that line {count} times in lines.js, so I didn't touch it. Edit lines.js directly for this one."
+    src = src.replace(old_lit, json.dumps(new, ensure_ascii=False))
+    tmp = LINES_JS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(src)
+    os.replace(tmp, LINES_JS)
+    return None
 
 
 def remove_key(key):
@@ -84,8 +115,24 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.reply(400, {"error": "bad key"})
         if path == "/api/delete":
             remove_key(key)
+            texts = read_texts()
+            texts.pop(key, None)
+            write_texts(texts)
             write_manifest()
             return self.reply(200, {"ok": True})
+        if path == "/api/text":
+            length = int(self.headers.get("Content-Length", 0))
+            if length > 20000:
+                return self.reply(400, {"error": "too long"})
+            body = json.loads(self.rfile.read(length) or b"{}")
+            old, new = body.get("old"), body.get("new")
+            if not isinstance(old, str) or not isinstance(new, str) or not new.strip():
+                return self.reply(400, {"error": "The line can't be empty."})
+            new = " ".join(new.split())  # no line breaks inside a line
+            err = replace_line(old, new)
+            if err:
+                return self.reply(409, {"error": err})
+            return self.reply(200, {"ok": True, "text": new})
         if path != "/api/save":
             return self.reply(404, {"error": "unknown"})
         length = int(self.headers.get("Content-Length", 0))
@@ -106,6 +153,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             fallback = os.path.join(AUDIO, key + ".wav")  # keep the WAV if conversion fails
             os.replace(wav, fallback)
             os.chmod(fallback, 0o644)
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        texts = read_texts()
+        texts[key] = (q.get("text") or [""])[0]
+        write_texts(texts)
         write_manifest()
         return self.reply(200, {"ok": True, "clips": clips()})
 
