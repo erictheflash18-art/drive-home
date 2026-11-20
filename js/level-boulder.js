@@ -646,6 +646,7 @@ const BoulderLevel = (() => {
     async start() {
       reset();
       const me = s;
+      Engine.setControls("◀", "▶");
       await Engine.say(L.intro);
       if (me.dead) return;
       s.state = "drive";

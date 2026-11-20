@@ -204,7 +204,7 @@ const Art = {
     ctx.save(); ctx.translate(x, y); ctx.rotate(t * 0.8);
     const s = 1 + Math.sin(t * 4) * 0.06;
     ctx.scale(s, s);
-    const colors = [["#ff9f1c", "#ffbf69"], ["#f15bb5", "#ff9ed2"], ["#fee440", "#fff3a3"]][hue % 3];
+    const colors = [["#ff9f1c", "#ffbf69"], ["#f15bb5", "#ff9ed2"], ["#fee440", "#fff3a3"]][Math.abs(Math.floor(hue)) % 3];
     for (let layer = 0; layer < 2; layer++) {
       ctx.fillStyle = colors[layer];
       const n = 12, r = layer ? 8 : 13;
@@ -337,6 +337,124 @@ const Art = {
     ctx.fillText("♪", -30 - n * 10, -20 - n * 30);
     ctx.fillText("♫", 30 + n * 10, -10 - n * 30);
     ctx.restore();
+  },
+
+  // ================= SIDE VIEW (Kenosha Pass) =================
+  // Car facing right; (0,0) is where the wheels touch the ground.
+  sideCar(ctx, wheelRot) {
+    // wheels
+    for (const wx of [-23, 23]) {
+      ctx.save(); ctx.translate(wx, -11); ctx.rotate(wheelRot);
+      ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#adb5bd"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#6c757d"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(5, 0); ctx.moveTo(0, -5); ctx.lineTo(0, 5); ctx.stroke();
+      ctx.restore();
+    }
+    // body
+    ctx.fillStyle = "#2ec4b6";
+    ctx.beginPath();
+    ctx.moveTo(-37, -14); ctx.lineTo(-37, -30); ctx.quadraticCurveTo(-36, -34, -30, -34);
+    ctx.lineTo(-18, -34); ctx.lineTo(-12, -50); ctx.quadraticCurveTo(-10, -53, -5, -53);
+    ctx.lineTo(12, -53); ctx.quadraticCurveTo(16, -53, 19, -48); ctx.lineTo(25, -34);
+    ctx.lineTo(33, -32); ctx.quadraticCurveTo(38, -31, 38, -25); ctx.lineTo(38, -14); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#24a399"; ctx.fillRect(-37, -18, 75, 5);
+    // window + penguin
+    ctx.fillStyle = "#bde8ff";
+    ctx.beginPath(); ctx.moveTo(-13, -35); ctx.lineTo(-8, -48); ctx.lineTo(11, -48); ctx.lineTo(19, -35); ctx.closePath(); ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(-13, -35); ctx.lineTo(-8, -48); ctx.lineTo(11, -48); ctx.lineTo(19, -35); ctx.closePath(); ctx.clip();
+    ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(3, -38, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(6, -38, 5, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(7, -39, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f7a21b"; ctx.beginPath(); ctx.moveTo(10, -38); ctx.lineTo(15, -36.5); ctx.lineTo(10, -35); ctx.fill();
+    ctx.restore();
+    // party hat poking out of the sunroof
+    ctx.fillStyle = "#9b5de5";
+    ctx.beginPath(); ctx.moveTo(-2, -53); ctx.lineTo(3, -66); ctx.lineTo(8, -53); ctx.fill();
+    ctx.fillStyle = "#f15bb5"; ctx.beginPath(); ctx.arc(3, -67, 2.5, 0, Math.PI * 2); ctx.fill();
+    // lights
+    ctx.fillStyle = "#fff6c2"; ctx.fillRect(35, -28, 3, 5);
+    ctx.fillStyle = "#ff4d4d"; ctx.fillRect(-37, -29, 3, 6);
+  },
+
+  sideRV(ctx, wheelRot) {
+    ctx.fillStyle = "#f1f3f5";
+    this.rr(ctx, -72, -84, 144, 70, 8); ctx.fill();
+    ctx.fillStyle = "#e9c46a"; this.rr(ctx, 54, -60, 24, 46, 6); ctx.fill(); // cab nose
+    ctx.fillStyle = "#8d5b3b"; ctx.fillRect(-72, -46, 150, 7); ctx.fillRect(-72, -36, 150, 3);
+    ctx.fillStyle = "#9cc5de";
+    for (const wx of [-56, -24, 8]) this.rr(ctx, wx, -76, 24, 18, 3), ctx.fill();
+    this.rr(ctx, 56, -56, 18, 16, 3); ctx.fill();
+    ctx.fillStyle = "#ced4da"; this.rr(ctx, 40, -76, 10, 28, 2); ctx.fill(); // door
+    // bumper sticker on the back
+    ctx.fillStyle = "#fff"; ctx.fillRect(-80, -34, 14, 12);
+    ctx.fillStyle = "#e63946"; ctx.font = "800 9px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("♥", -73, -28);
+    for (const wx of [-46, 46]) {
+      ctx.save(); ctx.translate(wx, -12); ctx.rotate(wheelRot);
+      ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#adb5bd"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  },
+
+  sideVan(ctx, wheelRot, t) {
+    ctx.fillStyle = "#7b1e3a";
+    this.rr(ctx, -52, -66, 98, 52, 9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(46, -50); ctx.lineTo(58, -32); ctx.lineTo(58, -14); ctx.lineTo(46, -14); ctx.fill();
+    ctx.fillStyle = "#9cc5de"; this.rr(ctx, 30, -58, 18, 18, 3); ctx.fill();
+    ctx.fillStyle = "#f1e3c8"; ctx.font = "800 20px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("ΒΡΟ", -10, -40);
+    const flash = Math.floor(t * 6) % 2;
+    ctx.fillStyle = flash ? "#ff006e" : "#3a86ff";
+    ctx.beginPath(); ctx.arc(-6, -70, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffd23f"; ctx.font = "700 16px sans-serif";
+    const n = (t * 1.5) % 1;
+    ctx.globalAlpha = 1 - n; ctx.fillText("♪", -30 - n * 12, -78 - n * 30); ctx.fillText("♫", 20 + n * 12, -82 - n * 30);
+    ctx.globalAlpha = 1;
+    for (const wx of [-30, 34]) {
+      ctx.save(); ctx.translate(wx, -12); ctx.rotate(wheelRot);
+      ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#adb5bd"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  },
+
+  aspen(ctx, x, y, h, seed) {
+    ctx.fillStyle = "#f1ede4"; ctx.fillRect(x - 3, y - h, 6, h);
+    ctx.fillStyle = "#3d3a35";
+    for (let i = 1; i < 5; i++) ctx.fillRect(x - 3 + ((seed * 7 + i) % 3), y - h * (i / 5), 3, 2);
+    ctx.strokeStyle = "#cfc8ba"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y - h * 0.7); ctx.lineTo(x - 10, y - h * 0.85);
+    ctx.moveTo(x, y - h * 0.8); ctx.lineTo(x + 9, y - h * 0.95); ctx.stroke();
+    ctx.fillStyle = "rgba(244,180,0,.85)"; // the last golden leaves of the year
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.arc(x + ((seed * 13 + i * 7) % 22) - 11, y - h + ((seed + i * 5) % 14), 3, 0, Math.PI * 2); ctx.fill();
+    }
+  },
+
+  pine(ctx, x, y, h) {
+    ctx.fillStyle = "#5c4033"; ctx.fillRect(x - 2, y - 8, 4, 8);
+    ctx.fillStyle = "#2d6a4f";
+    for (let i = 0; i < 3; i++) {
+      const w = (h * 0.42) * (1 - i * 0.25), top = y - 8 - h * (0.35 + i * 0.3);
+      ctx.beginPath(); ctx.moveTo(x, top - h * 0.25); ctx.lineTo(x - w, top + h * 0.2); ctx.lineTo(x + w, top + h * 0.2); ctx.fill();
+    }
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.moveTo(x, y - 8 - h * 1.2); ctx.lineTo(x - 6, y - 8 - h * 1.05); ctx.lineTo(x + 6, y - 8 - h * 1.05); ctx.fill();
+  },
+
+  postSign(ctx, x, y, text, color) {
+    ctx.font = "700 15px 'Baloo 2', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const lines = this.wrap(ctx, text, 130);
+    const w = Math.min(150, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 22);
+    const h = 12 + lines.length * 17;
+    ctx.fillStyle = "#6b4f2a"; ctx.fillRect(x - 2, y - 60, 4, 60);
+    ctx.fillStyle = color || "#1e7a46"; this.rr(ctx, x - w / 2, y - 60 - h, w, h, 6); ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; this.rr(ctx, x - w / 2 + 3, y - 57 - h, w - 6, h - 6, 4); ctx.stroke();
+    ctx.fillStyle = "#fff";
+    lines.forEach((l, i) => ctx.fillText(l, x, y - 60 - h + 15 + i * 17));
   },
 
   sign(ctx, x, y, text, side) {

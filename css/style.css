@@ -274,3 +274,4 @@ h1 { font-size: 28px; line-height: 1.1; margin: 10px 0 6px; color: var(--gold); 
 .load-help { margin-top: 12px !important; }
 .save-msg.ok { color: var(--teal); font-weight: 700; opacity: 1; }
 .save-msg.bad { color: #ff8a95; font-weight: 700; opacity: 1; }
+.ctl { font-weight: 800; font-size: 26px; }

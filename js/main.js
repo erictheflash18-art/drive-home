@@ -1,6 +1,6 @@
 // Map screen, level switching, level-complete card.
 
-const LEVELS = { boulder: BoulderLevel };
+const LEVELS = { boulder: BoulderLevel, kenosha: KenoshaLevel };
 
 const Game = {
   init() {

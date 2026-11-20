@@ -29,12 +29,16 @@ const Engine = {
     const frame = (now) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      if (this.level && !this.paused && !this.dialogOpen && !document.hidden) this.level.update(dt);
-      if (this.level) {
-        this.ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, 0, 0);
-        this.level.draw(this.ctx);
+      requestAnimationFrame(frame); // first, so one bad frame can never freeze the game
+      try {
+        if (this.level && !this.paused && !this.dialogOpen && !document.hidden) this.level.update(dt);
+        if (this.level) {
+          this.ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, 0, 0);
+          this.level.draw(this.ctx);
+        }
+      } catch (e) {
+        if (!this.loggedError) { this.loggedError = true; console.error(e); }
       }
-      requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
   },
@@ -99,6 +103,11 @@ const Engine = {
       $("muteBtn").textContent = Sfx.muted ? "🔇" : "🔊";
       if (Sfx.muted) Voice.stop();
     });
+  },
+
+  setControls(left, right) {
+    $("leftBtn").textContent = left;
+    $("rightBtn").textContent = right;
   },
 
   steer() {
