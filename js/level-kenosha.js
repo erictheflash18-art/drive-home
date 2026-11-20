@@ -107,7 +107,8 @@ const KenoshaLevel = (() => {
       fuel: 100, flowers: 0, toes: 0, carsTotalled: 0, charm: false,
       state: "intro", cp: 200, objs: [], flags: {}, floaters: [],
       rv: { active: false, x: RV.start, pulled: false, pull: 0, taunt: 3 },
-      traffic: [], nextTraffic: 0, jumpWas: false, jumpBuf: 0,
+      traffic: [], nextTraffic: 0, jumpWas: false, jumpBuf: 0, onVeh: null,
+      skiers: [], nextSkier: 7,
       van: { on: false, x: 0, taunt: 5 },
       crashT: 0, flipFrom: 0, zoom: 1, shrinkT: 0, smallPending: false, nextToe: 9,
       camX: 200 - (Engine.W / ZOOM) * 0.3, camY: gy(200) - (Engine.H / ZOOM) * 0.58,
@@ -179,6 +180,7 @@ const KenoshaLevel = (() => {
     if (driving) events(dt);
     updateRV(dt);
     updateTraffic(dt);
+    updateSkiers(dt);
     updateVan(dt);
     if (driving || s.state === "stopping") touchObjects();
     camera(dt);
@@ -187,6 +189,7 @@ const KenoshaLevel = (() => {
 
   function physics(dt, gas, brake) {
     if (s.state === "drive") s.fuel = Math.max(0, s.fuel - (Math.abs(s.vx) * 0.013 + (gas ? 0.6 : 0)) * dt);
+    if (s.onVeh) return rideRoof(dt, gas);
     if (!s.air) {
       const th = Math.atan(slope(s.x));       // >0 downhill, <0 uphill
       const icy = s.x > STEEP[0] && s.x < STEEP[1];
@@ -244,10 +247,49 @@ const KenoshaLevel = (() => {
       else s.av += (diff * 7 - s.av * 3) * dt;
       s.av = clamp(s.av, -7, 7);
       s.ang += s.av * dt;
-      if (s.y >= gy(s.x)) land();
+      // landing on top of a truck/minivan: ride it
+      const prevY = s.y - s.vy * dt;
+      for (const v of s.traffic) {
+        if (s.vy <= 0 || Math.abs(s.x - v.x) > v.len / 2 + 4) continue;
+        const roof = by(v.x) - v.h;
+        if (prevY <= roof + 4 && s.y >= roof) { landOnRoof(v, roof); break; }
+      }
+      if (s.air && s.y >= gy(s.x)) land();
     }
     s.wheel += (s.air ? s.vx * 0.6 : s.sp) * dt / 11;
     s.x = Math.max(60, s.x);
+  }
+
+  function roofSlope(v) { return Math.atan((by(v.x + 10) - by(v.x - 10)) / 20); }
+
+  function landOnRoof(v, roof) {
+    const th = roofSlope(v);
+    const diff = Math.atan2(Math.sin(s.ang - th), Math.cos(s.ang - th));
+    s.y = roof;
+    if (Math.abs(diff) > 1.05) { s.y = gy(s.x); return flip(); }
+    s.air = false; s.onVeh = v; s.av = 0; s.w = 0; s.ang = th;
+    s.sp = Math.max(s.vx, v.speed);
+    Sfx.tone(180, 0.15, "sine", 0.12, 0, 320);
+    if (!v.rode) { v.rode = true; Engine.toast(L.roofBounce, "good"); }
+  }
+
+  // Driving along a roof: drive or jump off the end
+  function rideRoof(dt, gas) {
+    const v = s.onVeh;
+    s.sp = clamp(s.sp + ((gas ? ACCEL : 0) - 0.3 * s.sp) * dt, v.speed, MAXV);
+    s.vx = s.sp; s.vy = 0;
+    if (s.jumpBuf > 0 && s.state === "drive") {
+      s.jumpBuf = 0; s.onVeh = null; s.air = true; s.vy = -JUMP_V; s.av = 0; s.y -= 1;
+      Sfx.tone(300, 0.18, "square", 0.07, 0, 700);
+      return;
+    }
+    s.x += s.sp * dt;
+    s.y = by(v.x) - v.h;
+    s.ang = roofSlope(v);
+    if (!s.traffic.includes(v) || Math.abs(s.x - v.x) > v.len / 2 + 6) { // drove off the end
+      s.onVeh = null; s.air = true; s.vy = -40; s.av = 0;
+    }
+    s.wheel += s.sp * dt / 11;
   }
 
   function land() {
@@ -264,6 +306,7 @@ const KenoshaLevel = (() => {
   }
 
   function flip() {
+    s.onVeh = null;
     if (s.state !== "drive") { // mid-cutscene: just put it back on its wheels
       s.air = false; s.w = 0; s.av = 0; s.ang = Math.atan(slope(s.x)); s.y = gy(s.x);
       return;
@@ -288,6 +331,7 @@ const KenoshaLevel = (() => {
     s.fuel = Math.max(s.fuel, 60);
     s.state = "drive";
     s.traffic = s.traffic.filter((v) => v.x - v.len / 2 > s.x + 300);
+    s.onVeh = null; s.skiers = [];
     if (s.van.on) s.van.x = s.x - 750;
     Sfx.blip();
   }
@@ -418,7 +462,7 @@ const KenoshaLevel = (() => {
         if (r.taunt <= 0) { r.taunt = rand(5, 7); Sfx.honk(); Engine.toast(pick(L.rvTaunts)); }
       }
       // no passing zone: you can't get past it
-      const limit = r.x - 72 - 40;
+      const limit = r.x - 95 - 38; // the back of the RV (ladder included)
       if (s.x > limit && s.air) { // tried to jump it
         s.x = limit; s.vx = Math.min(s.vx, RV.speed * 0.5);
         if (!r.noJumpSaid) { r.noJumpSaid = true; Engine.toast(L.rvNoJump, "bad"); }
@@ -445,15 +489,10 @@ const KenoshaLevel = (() => {
       v.wheel += v.speed * dt / 12;
       if (s.state !== "drive") continue;
       const front = v.x + v.len / 2, back = v.x - v.len / 2;
+      if (s.onVeh === v) continue;
       if (s.x + 36 < back || s.x - 36 > front) continue;   // not overlapping
       const roof = by(v.x) - v.h;
-      if (s.air && s.vy > 0 && s.y - 8 <= roof + 14) {      // landing on top of it: boing
-        s.y = roof; s.vy = -330; s.av = 0;
-        Sfx.tone(200, 0.2, "sine", 0.12, 0, 600);
-        if (!v.bounced) { v.bounced = true; Engine.toast(L.roofBounce, "good"); }
-        continue;
-      }
-      if (s.y <= roof + 6) continue;                        // clearing it
+      if (s.y <= roof + 10) continue;                       // above it (or about to land on it)
       // rear-ended it
       s.x = back - 38;
       if (s.air) { s.vx = Math.min(s.vx, v.speed * 0.5); }
@@ -468,6 +507,38 @@ const KenoshaLevel = (() => {
     }
     s.invuln = Math.max(0, (s.invuln || 0) - dt);
     s.traffic = s.traffic.filter((v) => v.x > s.x - 900);
+  }
+
+  // Skiers doing road gaps over the pass. They fly across the sky: harmless if you're on
+  // the road, but jump at the wrong moment and you meet one.
+  const SKIER_COLORS = ["#ff006e", "#3a86ff", "#06d6a0", "#ffbe0b", "#8338ec"];
+  function updateSkiers(dt) {
+    const quiet = (s.x > RV.start - 900 && s.x < RV.end) || (s.x > STEEP[0] - 300 && s.x < SUMMIT + 400) || s.x < 1500;
+    if (s.state === "drive" && !quiet) {
+      s.nextSkier -= dt;
+      if (s.nextSkier <= 0) { s.nextSkier = rand(4.5, 8); spawnSkier(); }
+    }
+    for (const k of s.skiers) {
+      k.t += dt;
+      k.x += k.vx * dt; k.vy += 240 * dt; k.y += k.vy * dt; k.rot += k.spin * dt;
+      if (k.hit || s.state !== "drive") continue;
+      if ((s.air || s.onVeh) && Math.abs(k.x - s.x) < 50 && Math.abs(k.y - (s.y - 26)) < 46) hitBySkier(k);
+    }
+    s.skiers = s.skiers.filter((k) => k.y < by(k.x) - 4 && k.x > s.camX - 200 && k.t < 9);
+  }
+  function spawnSkier() {
+    const z = ZOOM * s.zoom;
+    const x = s.camX + Engine.W / z + 30;
+    s.skiers.push({ x, y: by(x) - rand(190, 270), vx: -rand(210, 270), vy: -rand(50, 110),
+      t: 0, rot: rand(-0.3, 0.3), spin: rand(-1.2, 1.2), color: pick(SKIER_COLORS), hit: false });
+  }
+  function hitBySkier(k) {
+    k.hit = true; k.vx = 180; k.vy = -260; k.spin = 14;
+    if (s.onVeh) { s.onVeh = null; s.air = true; }
+    s.av = 4; s.spinT = 0.12; s.vy = Math.max(s.vy, 260); s.vx *= 0.7; // knocked down, a little wobble
+    Sfx.crash(); Engine.shake = 7;
+    if (s.flowers > 0) { s.flowers--; s.floaters.push({ x: s.x, y: s.y - 90, text: "-1 🌼", t: 0 }); }
+    Engine.toast(pick(L.skierHit), "bad");
   }
 
   function updateVan(dt) {
@@ -636,6 +707,12 @@ const KenoshaLevel = (() => {
 
     // the penguin's car (+ balloon)
     drawCar(ctx);
+
+    for (const k of s.skiers) { // drawn 40% bigger so they read on a phone
+      ctx.save(); ctx.translate(k.x, k.y); ctx.scale(1.4, 1.4);
+      Art.skier(ctx, 0, 0, k.rot, k.color, s.t, k.hit ? "" : L.skierYell);
+      ctx.restore();
+    }
 
     // floating text
     for (const f of s.floaters) {

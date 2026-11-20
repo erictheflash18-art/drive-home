@@ -378,24 +378,61 @@ const Art = {
     ctx.fillStyle = "#ff4d4d"; ctx.fillRect(-37, -29, 3, 6);
   },
 
+  // The RV: absurdly tall, with everything they own strapped to the roof. Can't be jumped.
   sideRV(ctx, wheelRot) {
-    ctx.fillStyle = "#f1f3f5";
-    this.rr(ctx, -72, -84, 144, 70, 8); ctx.fill();
-    ctx.fillStyle = "#e9c46a"; this.rr(ctx, 54, -60, 24, 46, 6); ctx.fill(); // cab nose
-    ctx.fillStyle = "#8d5b3b"; ctx.fillRect(-72, -46, 150, 7); ctx.fillRect(-72, -36, 150, 3);
+    const top = -250;
+    ctx.fillStyle = "#f1f3f5"; this.rr(ctx, -78, top, 152, -top - 14, 10); ctx.fill();
+    ctx.fillStyle = "#e9c46a"; this.rr(ctx, 60, -64, 26, 50, 6); ctx.fill();            // cab nose
+    ctx.fillStyle = "#8d5b3b";
+    for (const sy of [-60, -130, -200]) { ctx.fillRect(-78, sy, 152, 7); ctx.fillRect(-78, sy + 10, 152, 3); }
     ctx.fillStyle = "#9cc5de";
-    for (const wx of [-56, -24, 8]) this.rr(ctx, wx, -76, 24, 18, 3), ctx.fill();
-    this.rr(ctx, 56, -56, 18, 16, 3); ctx.fill();
-    ctx.fillStyle = "#ced4da"; this.rr(ctx, 40, -76, 10, 28, 2); ctx.fill(); // door
-    // bumper sticker on the back
-    ctx.fillStyle = "#fff"; ctx.fillRect(-80, -34, 14, 12);
-    ctx.fillStyle = "#e63946"; ctx.font = "800 9px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("♥", -73, -28);
-    for (const wx of [-46, 46]) {
+    for (const sy of [-108, -178, -238]) for (const wx of [-64, -30, 4, 38]) { this.rr(ctx, wx, sy, 24, 20, 3); ctx.fill(); }
+    this.rr(ctx, 62, -58, 18, 16, 3); ctx.fill();
+    ctx.fillStyle = "#ced4da"; this.rr(ctx, 46, -98, 14, 40, 2); ctx.fill();             // door
+    ctx.strokeStyle = "#adb5bd"; ctx.lineWidth = 2;                                      // ladder up the back
+    ctx.beginPath(); ctx.moveTo(-84, -16); ctx.lineTo(-84, top); ctx.moveTo(-92, -16); ctx.lineTo(-92, top);
+    for (let y = -26; y > top; y -= 14) { ctx.moveTo(-92, y); ctx.lineTo(-84, y); } ctx.stroke();
+    // roof junk: kayak, bikes, satellite dish, flag
+    ctx.fillStyle = "#f77f00"; ctx.beginPath(); ctx.ellipse(-10, top - 8, 70, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
+    for (const bx of [-50, -18, 14]) {
+      ctx.beginPath(); ctx.arc(bx - 9, top - 26, 8, 0, Math.PI * 2); ctx.arc(bx + 9, top - 26, 8, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx - 9, top - 26); ctx.lineTo(bx, top - 36); ctx.lineTo(bx + 9, top - 26); ctx.stroke();
+    }
+    ctx.fillStyle = "#adb5bd"; ctx.beginPath(); ctx.arc(52, top - 26, 14, Math.PI, Math.PI * 2.2); ctx.fill();
+    ctx.fillStyle = "#555"; ctx.fillRect(50, top - 26, 3, 26);
+    ctx.fillRect(-72, top - 80, 2, 72);
+    ctx.fillStyle = "#e63946"; ctx.fillRect(-70, top - 80, 30, 18);
+    ctx.fillStyle = "#fff"; ctx.font = "800 7px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("GRANDKIDS", -55, top - 71);
+    // bumper sticker
+    ctx.fillStyle = "#fff"; ctx.fillRect(-78, -34, 16, 12);
+    ctx.fillStyle = "#e63946"; ctx.font = "800 9px sans-serif"; ctx.fillText("♥", -70, -28);
+    for (const wx of [-50, 48]) {
       ctx.save(); ctx.translate(wx, -12); ctx.rotate(wheelRot);
-      ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#adb5bd"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
+    }
+  },
+
+  // A skier mid road-gap: crossed skis, poles out, big grin
+  skier(ctx, x, y, rot, color, t, yell) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    ctx.strokeStyle = "#1b1f2e"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-22, 16); ctx.lineTo(20, 8); ctx.moveTo(-18, 6); ctx.lineTo(22, 18); ctx.stroke(); // crossed skis
+    ctx.strokeStyle = "#adb5bd"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-6, -4); ctx.lineTo(-24, -14); ctx.moveTo(6, -4); ctx.lineTo(24, -16); ctx.stroke(); // poles
+    ctx.fillStyle = color; this.rr(ctx, -8, -12, 16, 22, 6); ctx.fill();                  // jacket
+    ctx.fillStyle = "#2b2d42"; ctx.fillRect(-6, 8, 5, 6); ctx.fillRect(1, 8, 5, 6);
+    ctx.fillStyle = "#ffd7b5"; ctx.beginPath(); ctx.arc(0, -18, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, -20, 7.5, Math.PI, 0); ctx.fill();   // helmet
+    ctx.fillStyle = "#ffbe0b"; this.rr(ctx, -6, -21, 12, 5, 2); ctx.fill();               // goggles
+    ctx.restore();
+    if (yell) {
+      ctx.font = "800 15px 'Baloo 2', sans-serif"; ctx.textAlign = "center";
+      ctx.lineWidth = 4; ctx.strokeStyle = "#fff"; ctx.strokeText(yell, x, y - 36);
+      ctx.fillStyle = "#e63946"; ctx.fillText(yell, x, y - 36);
     }
   },
 

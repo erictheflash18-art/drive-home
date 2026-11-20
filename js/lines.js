@@ -165,7 +165,13 @@ const LINES = {
       "YO JOHN, the minivan is fine. You are not.",
       "YO JOHN, JUMP. The button literally says JUMP.",
     ],
-    roofBounce: "YO JOHN, ROOF BOUNCE.",
+    roofBounce: "YO JOHN, you're riding on top of a truck. This is fine.",
+    skierHit: [
+      "YO JOHN, you got hit by a skier doing a road gap.",
+      "YO JOHN, that skier did NOT look both ways.",
+      "YO JOHN, SEND IT, said the skier. Into you.",
+    ],
+    skierYell: "SEND IT!",
     falseSummitSign: "SUMMIT!",
     falseSummitBanner: "YOU MADE IT TO THE TOP!",
     falseSummit: [
