@@ -118,7 +118,7 @@ const LINES = {
     ],
     finalSign: "US-285 SOUTH → Durango",
     note:
-      "YO JOHN, you made it out of Boulder! I know the drive is long, but every mile gets you closer to the people who love you. I'm so proud of you. (Placeholder: write your Day 1 note here!)",
+      "Happy birthday Reese. In 5 days you'll be done. Hopefully this game that you need to complete to get your gift certificate brings you something these next 5 days. I love you.",
   },
 
   // ---------------- FUTURE LEVELS (not built yet) ----------------
