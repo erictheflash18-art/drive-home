@@ -13,7 +13,7 @@ const Engine = {
   level: null,
   paused: false,
   dialogOpen: false,
-  input: { left: false, right: false },
+  input: { left: false, right: false, up: false },
   onToe: null,
 
   init() {
@@ -67,7 +67,8 @@ const Engine = {
   },
 
   bindInput() {
-    const keyMap = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right" };
+    const keyMap = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right",
+      ArrowUp: "up", w: "up", W: "up" };
     const typing = (e) => e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
     window.addEventListener("keydown", (e) => {
       if (typing(e) || !this.level) return; // typing a save code, or on the map

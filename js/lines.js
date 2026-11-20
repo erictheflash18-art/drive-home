@@ -137,7 +137,8 @@ const LINES = {
     name: "Kenosha Pass",
     intro: [
       "YO JOHN, we made it out of Boulder. Next up: Kenosha Pass. 10,000 feet.",
-      "Right is gas, left is brake. In the air, left and right tilt the car. Land on your wheels.",
+      "Right button is GAS. Left button is JUMP. There are no brakes. Brakes are for quitters.",
+      "Jump over the slow semis and minivans. Do NOT rear-end them.",
       "The car runs on Snickers now. Don't ask. Grab them or you'll get hangry.",
       "4 days till my birthday. Let's go.",
     ],
@@ -158,6 +159,13 @@ const LINES = {
       "YO JOHN, the RV just signaled. Nevermind. It didn't.",
     ],
     rvGone: "YO JOHN, the RV FINALLY pulled over. Freedom.",
+    rvNoJump: "YO JOHN, you can't jump an RV. It's too tall. Respect the RV.",
+    rearEnd: [
+      "YO JOHN, you rear-ended a semi.",
+      "YO JOHN, the minivan is fine. You are not.",
+      "YO JOHN, JUMP. The button literally says JUMP.",
+    ],
+    roofBounce: "YO JOHN, ROOF BOUNCE.",
     falseSummitSign: "SUMMIT!",
     falseSummitBanner: "YOU MADE IT TO THE TOP!",
     falseSummit: [

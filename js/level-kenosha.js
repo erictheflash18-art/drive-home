@@ -9,6 +9,12 @@ const KenoshaLevel = (() => {
   const G_AIR = 600;          // gravity in the air (jumps feel floaty)
   const RAMP_LEN = 200;       // jump ramps: length of the run-up
   const POP = 130;            // extra upward kick when leaving a ramp
+  const JUMP_V = 480;         // the JUMP button
+  // Slow traffic to jump over: [x where it appears, type]. Speeds/sizes below.
+  const TRAFFIC = [[1700, "minivan"], [3500, "semi"], [4300, "minivan"], [10300, "semi"], [12000, "minivan"],
+    [14100, "semi"], [20500, "minivan"], [22700, "semi"], [25400, "minivan"]];
+  const VEHICLE = { semi: { len: 200, h: 84, speed: 150 }, minivan: { len: 96, h: 58, speed: 175 } };
+  const VAN_COLORS = ["#c9b79c", "#8d99ae", "#b5838d"];
   const ACCEL = 540;          // engine
   const MAXV = 430;
   const ZOOM = 0.72;          // how zoomed out the camera is
@@ -101,6 +107,7 @@ const KenoshaLevel = (() => {
       fuel: 100, flowers: 0, toes: 0, carsTotalled: 0, charm: false,
       state: "intro", cp: 200, objs: [], flags: {}, floaters: [],
       rv: { active: false, x: RV.start, pulled: false, pull: 0, taunt: 3 },
+      traffic: [], nextTraffic: 0, jumpWas: false, jumpBuf: 0,
       van: { on: false, x: 0, taunt: 5 },
       crashT: 0, flipFrom: 0, zoom: 1, shrinkT: 0, smallPending: false, nextToe: 9,
       camX: 200 - (Engine.W / ZOOM) * 0.3, camY: gy(200) - (Engine.H / ZOOM) * 0.58,
@@ -158,7 +165,11 @@ const KenoshaLevel = (() => {
 
     const driving = s.state === "drive";
     const gas = driving && Engine.input.right && s.fuel > 0;
-    const brake = (driving && Engine.input.left) || s.state === "stopping";
+    const brake = s.state === "stopping"; // no brake button anymore; only cutscenes stop the car
+    const jumpHeld = driving && (Engine.input.left || Engine.input.up);
+    if (jumpHeld && !s.jumpWas) s.jumpBuf = 0.15; // a press just before landing still counts
+    s.jumpWas = jumpHeld;
+    s.jumpBuf = Math.max(0, s.jumpBuf - dt);
     if (s.state === "crash") {
       s.crashT -= dt;
       if (s.crashT <= 0) respawn();
@@ -167,6 +178,7 @@ const KenoshaLevel = (() => {
     }
     if (driving) events(dt);
     updateRV(dt);
+    updateTraffic(dt);
     updateVan(dt);
     if (driving || s.state === "stopping") touchObjects();
     camera(dt);
@@ -198,6 +210,14 @@ const KenoshaLevel = (() => {
       s.vx = s.sp * dx; s.vy = s.sp * dy;
       const nx = s.x + s.vx * dt;
       const fly = s.y + s.vy * dt + 0.5 * G * dt * dt;
+      if (s.jumpBuf > 0 && s.state === "drive") { // JUMP
+        s.jumpBuf = 0;
+        s.air = true; s.w = 0; s.av = 0; s.ang = th;
+        s.vx = Math.max(s.vx, 60); s.vy -= JUMP_V;
+        s.y -= 1;
+        Sfx.tone(300, 0.18, "square", 0.07, 0, 700);
+        return;
+      }
       const offLip = ramp && s.x < ramp[0] && nx >= ramp[0] && s.sp > 120;
       if (offLip || (s.sp > 140 && gy(nx) > fly + 1.5)) { // off a ramp, or the ground drops away: airborne
         s.air = true;
@@ -216,11 +236,9 @@ const KenoshaLevel = (() => {
     } else {
       s.vy += G_AIR * dt;
       s.x += s.vx * dt; s.y += s.vy * dt;
-      // The car steadies itself toward the slope it's about to land on; the buttons only lean it
-      // (gas = nose up, brake = nose down). Holding gas the whole jump is safe. A missed
-      // HOOK THE TOE mid-air (big spin) is what gets you.
-      const tilt = (gas || (s.state === "drive" && Engine.input.right) ? -1 : 0) + (brake ? 1 : 0);
-      const target = Math.atan(slope(s.x + s.vx * 0.25)) + tilt * 0.7;
+      // The car steadies itself toward the slope it's about to land on, so normal jumps are
+      // safe. A missed HOOK THE TOE mid-air (helpless spin) is what flips you.
+      const target = Math.atan(slope(s.x + s.vx * 0.25)) - (gas ? 0.15 : 0);
       const diff = Math.atan2(Math.sin(target - s.ang), Math.cos(target - s.ang));
       if (s.spinT > 0) s.spinT -= dt;
       else s.av += (diff * 7 - s.av * 3) * dt;
@@ -269,6 +287,7 @@ const KenoshaLevel = (() => {
     s.ang = Math.atan(slope(s.x));
     s.fuel = Math.max(s.fuel, 60);
     s.state = "drive";
+    s.traffic = s.traffic.filter((v) => v.x - v.len / 2 > s.x + 300);
     if (s.van.on) s.van.x = s.x - 750;
     Sfx.blip();
   }
@@ -400,6 +419,10 @@ const KenoshaLevel = (() => {
       }
       // no passing zone: you can't get past it
       const limit = r.x - 72 - 40;
+      if (s.x > limit && s.air) { // tried to jump it
+        s.x = limit; s.vx = Math.min(s.vx, RV.speed * 0.5);
+        if (!r.noJumpSaid) { r.noJumpSaid = true; Engine.toast(L.rvNoJump, "bad"); }
+      }
       if (s.x > limit && !s.air) {
         if (s.sp > RV.speed + 140) { Sfx.noise(0.15, 0.3); Engine.shake = 4; }
         s.x = limit; s.y = gy(s.x);
@@ -408,6 +431,43 @@ const KenoshaLevel = (() => {
     } else {
       r.pull = Math.min(1, r.pull + dt * 0.5);
     }
+  }
+
+  function updateTraffic(dt) {
+    // spawn each vehicle a bit ahead of you as you get close
+    while (s.nextTraffic < TRAFFIC.length && s.x > TRAFFIC[s.nextTraffic][0] - 700) {
+      const [x, type] = TRAFFIC[s.nextTraffic++];
+      if (x < s.x - 200) continue; // respawned past it already
+      s.traffic.push({ type, x, wheel: 0, color: pick(VAN_COLORS), ...VEHICLE[type] });
+    }
+    for (const v of s.traffic) {
+      v.x += v.speed * dt;
+      v.wheel += v.speed * dt / 12;
+      if (s.state !== "drive") continue;
+      const front = v.x + v.len / 2, back = v.x - v.len / 2;
+      if (s.x + 36 < back || s.x - 36 > front) continue;   // not overlapping
+      const roof = by(v.x) - v.h;
+      if (s.air && s.vy > 0 && s.y - 8 <= roof + 14) {      // landing on top of it: boing
+        s.y = roof; s.vy = -330; s.av = 0;
+        Sfx.tone(200, 0.2, "sine", 0.12, 0, 600);
+        if (!v.bounced) { v.bounced = true; Engine.toast(L.roofBounce, "good"); }
+        continue;
+      }
+      if (s.y <= roof + 6) continue;                        // clearing it
+      // rear-ended it
+      s.x = back - 38;
+      if (s.air) { s.vx = Math.min(s.vx, v.speed * 0.5); }
+      else { s.y = gy(s.x); s.sp = Math.min(s.sp, v.speed * 0.5); }
+      if (s.invuln > 0) continue;
+      s.invuln = 1.2;
+      Sfx.crash(); Engine.shake = 8;
+      s.carsTotalled++; Save.bump("carsTotalled");
+      if (s.flowers > 0) { s.flowers--; s.floaters.push({ x: s.x, y: s.y - 90, text: "-1 🌼", t: 0 }); }
+      s.floaters.push({ x: s.x, y: s.y - 120, text: "CARS TOTALLED: " + s.carsTotalled, t: 0 });
+      Engine.toast(pick(L.rearEnd), "bad");
+    }
+    s.invuln = Math.max(0, (s.invuln || 0) - dt);
+    s.traffic = s.traffic.filter((v) => v.x > s.x - 900);
   }
 
   function updateVan(dt) {
@@ -566,6 +626,14 @@ const KenoshaLevel = (() => {
       ctx.restore();
     }
 
+    // slow traffic
+    for (const v of s.traffic) {
+      if (v.x < x0 - 150 || v.x > x1 + 150) continue;
+      ctx.save(); ctx.translate(v.x, by(v.x)); ctx.rotate(Math.atan((by(v.x + 10) - by(v.x - 10)) / 20));
+      if (v.type === "semi") Art.sideSemi(ctx, v.wheel); else Art.sideMinivan(ctx, v.wheel, v.color);
+      ctx.restore();
+    }
+
     // the penguin's car (+ balloon)
     drawCar(ctx);
 
@@ -639,6 +707,7 @@ const KenoshaLevel = (() => {
     } else {
       ctx.rotate(s.ang);
     }
+    if (s.invuln > 0 && Math.floor(s.t * 12) % 2) ctx.globalAlpha = 0.45;
     Art.sideCar(ctx, s.wheel);
     ctx.restore();
     if (crashing) {
@@ -709,7 +778,7 @@ const KenoshaLevel = (() => {
     async start() {
       reset();
       const me = s;
-      Engine.setControls("◀ BRAKE", "GAS ▶");
+      Engine.setControls("JUMP ⤴", "GAS ▶");
       await Engine.say(L.intro);
       if (me.dead) return;
       s.state = "drive";

@@ -421,6 +421,48 @@ const Art = {
     }
   },
 
+  // Semi truck hauling (what else) Snickers. Facing right, (0,0) at road level, centered.
+  sideSemi(ctx, wheelRot) {
+    ctx.fillStyle = "#f1f3f5"; this.rr(ctx, -98, -82, 150, 66, 4); ctx.fill();          // trailer
+    ctx.fillStyle = "#5a3518"; ctx.fillRect(-90, -70, 134, 34);
+    ctx.fillStyle = "#fff"; ctx.font = "800 22px 'Baloo 2', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("SNICKERS", -23, -52);
+    ctx.fillStyle = "#adb5bd"; ctx.fillRect(-98, -18, 150, 5);
+    ctx.fillStyle = "#e63946"; this.rr(ctx, 56, -70, 44, 54, 6); ctx.fill();            // cab
+    ctx.fillStyle = "#9cc5de"; this.rr(ctx, 76, -64, 20, 18, 3); ctx.fill();
+    ctx.fillStyle = "#555"; ctx.fillRect(60, -84, 5, 16);                                 // exhaust stack
+    ctx.fillStyle = "#fff6c2"; ctx.fillRect(97, -30, 3, 6);
+    for (const wx of [-80, -58, 30, 84]) {
+      ctx.save(); ctx.translate(wx, -12); ctx.rotate(wheelRot);
+      ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#adb5bd"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  },
+
+  // Minivan with the stick-figure family on the back window
+  sideMinivan(ctx, wheelRot, color) {
+    ctx.fillStyle = color || "#c9b79c";
+    ctx.beginPath();
+    ctx.moveTo(-48, -14); ctx.lineTo(-48, -52); ctx.quadraticCurveTo(-47, -58, -40, -58);
+    ctx.lineTo(22, -58); ctx.lineTo(40, -38); ctx.lineTo(48, -34); ctx.lineTo(48, -14); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#9cc5de";
+    this.rr(ctx, -44, -53, 22, 16, 3); ctx.fill(); this.rr(ctx, -18, -53, 22, 16, 3); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(8, -53); ctx.lineTo(21, -53); ctx.lineTo(34, -38); ctx.lineTo(8, -38); ctx.fill();
+    ctx.strokeStyle = "#1b1f2e"; ctx.lineWidth = 1.3; // the stick-figure family
+    for (let i = 0; i < 4; i++) {
+      const fx = -41 + i * 5, sz = i < 2 ? 1 : 0.7;
+      ctx.beginPath(); ctx.arc(fx, -49 + (1 - sz) * 5, 1.5 * sz, 0, Math.PI * 2); ctx.moveTo(fx, -47.5 + (1 - sz) * 5); ctx.lineTo(fx, -42); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(0,0,0,.12)"; ctx.fillRect(-48, -26, 96, 4);
+    for (const wx of [-30, 30]) {
+      ctx.save(); ctx.translate(wx, -11); ctx.rotate(wheelRot);
+      ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#adb5bd"; ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  },
+
   aspen(ctx, x, y, h, seed) {
     ctx.fillStyle = "#f1ede4"; ctx.fillRect(x - 3, y - h, 6, h);
     ctx.fillStyle = "#3d3a35";
