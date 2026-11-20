@@ -54,6 +54,9 @@
     .edit-actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
     .edit-actions .save { background: var(--teal); }
     .edit-actions small { opacity: .6; }
+    .matched { font-size: 13px; color: var(--gold); margin-top: 4px; }
+    .matched i { opacity: .75; }
+    .matched a { color: #fff; font-weight: 800; margin-left: 6px; }
   </style>
 </head>
 <body>
@@ -69,6 +72,7 @@
         <span class="count" id="count"></span>
         <div class="meter"><i id="level"></i></div>
         <label><input type="checkbox" id="onlyMissing"> only show lines I haven't recorded</label>
+        <label><input type="checkbox" id="matchWords" checked> change the words to match what I said</label>
       </div>
       <div id="err"></div>
     </div>

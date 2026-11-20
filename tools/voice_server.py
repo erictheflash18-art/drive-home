@@ -132,6 +132,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             err = replace_line(old, new)
             if err:
                 return self.reply(409, {"error": err})
+            if body.get("keepRecording"):  # undoing a match: the take stays as-is
+                texts = read_texts()
+                if key in texts:
+                    texts[key] = new
+                    write_texts(texts)
             return self.reply(200, {"ok": True, "text": new})
         if path != "/api/save":
             return self.reply(404, {"error": "unknown"})
@@ -154,11 +159,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             os.replace(wav, fallback)
             os.chmod(fallback, 0o644)
         q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        said = (q.get("text") or [""])[0]
+        result = {"ok": True}
+        # Match the words to what was actually said (whisper.cpp, on this Mac)
+        if (q.get("match") or ["0"])[0] == "1" and said:
+            try:
+                import transcribe
+                if transcribe.available():
+                    clip = transcribe.clip_path(key)
+                    heard = transcribe.match(clip, said) if clip else None
+                    if heard and not replace_line(said, heard):
+                        result.update(matched=heard, previous=said)
+                        said = heard
+            except Exception as e:
+                result["matchError"] = str(e)
         texts = read_texts()
-        texts[key] = (q.get("text") or [""])[0]
+        texts[key] = said
         write_texts(texts)
         write_manifest()
-        return self.reply(200, {"ok": True, "clips": clips()})
+        result["clips"] = clips()
+        return self.reply(200, result)
 
 
 if __name__ == "__main__":

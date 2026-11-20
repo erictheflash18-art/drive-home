@@ -27,16 +27,16 @@ const LINES = {
     "YO JOHN, the car has feelings too.",
     "YO JOHN, eyes on the road please.",
     "YO JOHN, that's gonna leave a mark.",
-    "YO JOHN, insurance is not gonna love this.",
+    "YO JOHN, I don't think insurance is gonna love this.",
   ],
 
   // Hook the toe
   toePrompt: "HOOK THE TOE",
   toeSuccess: [
-    "HOW DOES THAT WORK",
+    "I DON'T REALLY KNOW HOW IT WORKS",
   ],
   toeFail: [
-    "YO JOHN, the toe went unhooked.",
+    "YO JOHN, the toe was not unhooked. Unbelievable.",
     "YO JOHN, you left the toe hanging.",
     "YO JOHN, the toe is disappointed in you.",
   ],
@@ -45,7 +45,7 @@ const LINES = {
   doesntLastLong: [
     "YO JOHN, it doesn't last long.",
     "YO JOHN, it never lasts long.",
-    "YO JOHN, see? It doesn't last long.",
+    "YO JOHN, see? It doesn't last that long.",
   ],
 
   // Driving through a puddle (she hates the water)
@@ -65,11 +65,11 @@ const LINES = {
     name: "Boulder",
     intro: [
       "YO JOHN. I need to get out of Boulder. The frats here violate penguins.",
-      "And my birthday is in 5 days. I HAVE to be home in Durango by the 25th.",
+      "My birthday is in 5 days. I HAVE to be home in Durango by the 25th.",
       "Will you help me get there?",
-      "Steer with the arrow keys (or the buttons on your phone). Grab the chrysanthemums. Don't hit the bikes. Boulder has a LOT of bikes.",
-      "Kombucha makes you go fast. And avoid the puddles, because THE WATER IS COLD.",
-      "And if you see HOOK THE TOE... hook the toe. (Tap it, or hit Space.)",
+      "YO Reese, Imma need you to steer with the arrow keys or the buttons on your phone. Grab the chrysanthemums. Please don't hit the bikes. It's not a good thing to do.",
+      "I know how much you love kombucha, so it makes you go fast. Avoid the puddles, because THE WATER IS A LITTLE COLD and you just don't want to do that.",
+      "If you see HOOK THE TOE... you need to HOOK THE TOE.",
     ],
     signs: [
       "YO JOHN, Pearl St →",
@@ -80,41 +80,41 @@ const LINES = {
       "Subaru count: 112",
     ],
     devilsThumbSign: "YO JOHN, Devil's Thumb ↑",
-    devils: "YO JOHN, the Devil's Thumb sent some friends.",
-    boost: "YO JOHN, KOMBUCHA POWER!",
+    devils: "YO JOHN, the Devil's Thumb sent you some friends.",
+    boost: "YO JOHN, THIS JOKE IS SO FUCKING STUPID.",
     floodSign: "YO JOHN, Boulder Creek flooding ahead",
-    flood: "YO JOHN, no way around this one.",
-    snackBreak: "YO JOHN, hold on. Snack break.",
-    snackDone: "...that was the last Snickers. Anyway.",
-    gpsWarning: "YO JOHN, GPS RECALCULATING — CONTROLS FLIPPED",
-    fakeComplete: "LEVEL COMPLETE!",
+    flood: "YO JOHN, I don't think there's any way around this one.",
+    snackBreak: "Reese is a little fat ass.",
+    snackDone: "I can't believe you ate the last Snickers bar. Unreal.",
+    gpsWarning: "YO JOHN, WE FUCKED UP. GPS RECALCULATED.",
+    fakeComplete: "HOLY SHIT, YOU DID IT.",
     forgot: [
-      "YO JOHN... wait. (It doesn't last long.)",
-      "You ate ALL the road trip Snickers in like four minutes.",
-      "You can't drive over a mountain pass without Snickers. Everyone knows this.",
-      "We're going back to the gas station.",
+      "YO JOHN, wait. Doesn't last that long.",
+      "You literally ate ALL the road trip Snickers in like four minutes.",
+      "I mean, you can't drive over a mountain pass without a Snickers bar. I thought you knew this.",
+      "We have to go back. We're going back. You're doing it again.",
     ],
     backSign: "YO JOHN, gas station: back that way (ugh)",
-    missedSnickers: "YO, you drove right past the Snickers. Again.",
-    gotSnickers: "YO JOHN, SNICKERS ACQUIRED. You found the Snickers charm for your bracelet!",
+    missedSnickers: "YO, you literally just drove past the Snickers bar again. We need that.",
+    gotSnickers: "YO, you got the Snickers bar? Now you're ready. And you get a little charm for your bracelet, possibly. I don't know though.",
 
     // The frat guys show up for the last stretch
     fratsAppear: [
-      "YO JOHN... is that a frat van?",
-      "THE FRAT GUYS SAW US AT THE GAS STATION. DRIVE!",
+      "YO JOHN... is that the frat?",
+      "FUCKING DRIVE.",
     ],
     fratTaunts: [
-      "YO JOHN, they're yelling SEND IT.",
-      "YO JOHN, they're blasting Mr. Brightside.",
-      "YO JOHN, one of them is doing a keg stand IN the van.",
-      "YO JOHN, they want to know if you're coming to the darty.",
+      "YO JOHN, they're yelling SEND IT. Fuck.",
+      "At least they got kinda bomb music taste.",
+      "YO JOHN, one of them is currently doing a keg stand IN the van.",
+      "YO, they want to know if you're coming to the darty or not.",
     ],
-    fratCaught: "YO JOHN, THE FRAT GUYS GOT YOU. They took 2 flowers.",
+    fratCaught: "THE FRAT GUYS GOT YOU bro. They took 2 of your flowers. It's fucked up.",
     fratLost: "YO JOHN, we lost them. For now.",
 
     outro: [
       "YO JOHN, WE MADE IT OUT OF BOULDER.",
-      "One leg down, four to go. Kenosha Pass opens tomorrow.",
+      "At least you did it. One leg down, four to go. Good luck.",
     ],
     finalSign: "US-285 SOUTH → Durango",
     note:

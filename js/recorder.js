@@ -97,7 +97,7 @@ const Rec = {
       l.row.classList.toggle("rec", i === this.recording);
       const btn = l.row.querySelector(".recbtn");
       btn.classList.toggle("on", i === this.recording);
-      btn.textContent = i === this.recording ? "■ Stop" : this.busy && i === this.sel ? "saving…" : stale ? "● Redo (words changed)" : has ? "● Redo" : "● Record";
+      btn.textContent = i === this.recording ? "■ Stop" : this.busy && i === this.sel ? "listening…" : stale ? "● Redo (words changed)" : has ? "● Redo" : "● Record";
     });
     document.querySelectorAll("h2").forEach((h) => {
       const any = this.lines.some((l) => l.section === h.dataset.section && !l.row.classList.contains("hidden"));
@@ -231,9 +231,16 @@ const Rec = {
       const wav = encodeWav(trimSilence(mixDown(audio), audio.sampleRate), audio.sampleRate);
       if (!wav) throw new Error("Didn't hear anything. Is the right mic selected?");
       const l = this.lines[i];
-      const r = await fetch(`/api/save?key=${encodeURIComponent(l.key)}&text=${encodeURIComponent(l.text)}`, { method: "POST", body: wav });
+      const match = document.getElementById("matchWords").checked ? 1 : 0;
+      const r = await fetch(`/api/save?key=${encodeURIComponent(l.key)}&text=${encodeURIComponent(l.text)}&match=${match}`, { method: "POST", body: wav });
       if (!r.ok) throw new Error("The save server said no. Is tools/voice_server.py running?");
-      this.clips = (await r.json()).clips;
+      const res = await r.json();
+      this.clips = res.clips;
+      if (res.matched) {
+        l.text = res.matched;
+        this.showWords(i);
+        this.showUndo(i, res.previous, res.matched);
+      }
       this.recordedText[l.key] = l.text;
       this.busy = false;
       // jump to the next line that still needs a recording
@@ -245,6 +252,28 @@ const Rec = {
       this.error(e.message);
       this.render();
     }
+  },
+
+  // "Changed to what you said" note with an undo link
+  showUndo(i, previous, matched) {
+    const l = this.lines[i];
+    const note = document.createElement("div");
+    note.className = "matched";
+    note.innerHTML = `Changed to what you said. Was: <i></i> <a href="#">↩ Undo</a>`;
+    note.querySelector("i").textContent = `"${previous}"`;
+    note.querySelector("a").addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const r = await fetch("/api/text?key=" + encodeURIComponent(l.key), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ old: matched, new: previous, keepRecording: true }),
+      });
+      if (!r.ok) return this.error((await r.json()).error || "Couldn't undo.");
+      l.text = previous;
+      this.recordedText[l.key] = previous;
+      this.showWords(i);
+      this.render();
+    });
+    l.row.querySelector(".words").appendChild(note);
   },
 
   play(i) {
