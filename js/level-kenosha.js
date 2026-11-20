@@ -5,7 +5,10 @@
 
 const KenoshaLevel = (() => {
   const L = LINES.kenosha;
-  const G = 900;              // gravity, px/s²
+  const G = 900;              // gravity on the ground (hills feel heavy)
+  const G_AIR = 600;          // gravity in the air (jumps feel floaty)
+  const RAMP_LEN = 200;       // jump ramps: length of the run-up
+  const POP = 130;            // extra upward kick when leaving a ramp
   const ACCEL = 540;          // engine
   const MAXV = 430;
   const ZOOM = 0.72;          // how zoomed out the camera is
@@ -22,12 +25,13 @@ const KenoshaLevel = (() => {
     [9900, -620], [11000, -700], [12000, -900], [13000, -980], [14200, -1150], [15300, -1350], [15800, -1360],
     [18300, -2650], [18600, -2700], [19900, -2720], [21000, -2500], [22500, -2150], [24000, -1850],
     [25500, -1500], [27000, -1350], [30000, -1350]];
-  const KICKERS = [[2600, 40], [5600, 45], [11600, 50], [13200, 80], [21800, 55], [23300, 60], [24800, 60], [26200, 70]];
+  const KICKERS = [[2600, 70], [5600, 95], [11600, 95], [13200, 110], [21800, 75], [23300, 80], [24800, 90], [26200, 100]];
   const BIG_JUMP = 13200;
   const BUMPY = [[1500, 4300], [4900, 7200], [9900, 15300], [19900, 27000]];
   const SIGN_X = [500, 2000, 6900, 11000, 13800, 21200, 27600];
 
   let ground = null;
+  let baseGround = null;      // the road without the ramps (ramps are drawn on top of it)
   let s;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const hash = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -55,14 +59,19 @@ const KenoshaLevel = (() => {
     for (let i = 0; i < n; i++) {
       const x = i * STEP;
       for (const [s0, e0] of BUMPY) if (x > s0 && x < e0) {
-        const fade = Math.min(1, (x - s0) / 300, (e0 - x) / 300);
+        let fade = Math.min(1, (x - s0) / 300, (e0 - x) / 300);
+        for (const [kx] of KICKERS) { // keep the run-up and landing zone smooth
+          const d = x < kx ? (kx - RAMP_LEN - 150 - x) : (x - (kx + 750));
+          if (d < 0) fade = 0; else if (d < 200) fade = Math.min(fade, d / 200);
+        }
         a[i] += fade * (Math.sin(x / 170) * 14 + Math.sin(x / 97 + 1.3) * 7);
       }
     }
-    for (const [kx, h] of KICKERS) { // jump ramps: curve up, then drop away
-      for (let x = kx - 160; x <= kx + 30; x += STEP) {
-        const d = x - (kx - 160);
-        const add = d <= 160 ? h * Math.pow(d / 160, 2) : h * Math.max(0, 1 - (d - 160) / 30);
+    baseGround = Float32Array.from(a);
+    for (const [kx, h] of KICKERS) { // jump ramps: curve up, then a short drop on the far side
+      for (let x = kx - RAMP_LEN; x <= kx + 40; x += STEP) {
+        const d = x - (kx - RAMP_LEN);
+        const add = d <= RAMP_LEN ? h * Math.pow(d / RAMP_LEN, 2) : h * Math.max(0, 1 - (d - RAMP_LEN) / 40);
         a[Math.round(x / STEP)] -= add;
       }
     }
@@ -75,6 +84,14 @@ const KenoshaLevel = (() => {
     return ground[i] * (1 - t) + ground[i + 1] * t;
   }
   function slope(x) { return (gy(x + 6) - gy(x - 6)) / 12; }
+  function by(x) { // road height ignoring ramps
+    const f = x / STEP;
+    const i = clamp(Math.floor(f), 0, baseGround.length - 2);
+    const t = f - i;
+    return baseGround[i] * (1 - t) + baseGround[i + 1] * t;
+  }
+  function lipAngle(kx) { return Math.atan((gy(kx - 2) - gy(kx - 14)) / 12); } // ramp angle right at the edge
+  function rampAt(x) { return KICKERS.find(([kx]) => x > kx - RAMP_LEN - 5 && x < kx + 5); }
 
   // ---------- Setup ----------
   function reset() {
@@ -104,8 +121,14 @@ const KenoshaLevel = (() => {
       for (let i = 0; i < 3; i++) add({ type: "flower", x: x + i * 45, air: 0, hue: (Math.floor(x / 10) + i) % 3 });
     }
     // flowers in the air over each jump: you have to fly through them
-    for (const [kx, h] of KICKERS) { // along the arc of a jump at normal speed
-      [[60, 1.3], [120, 1.1], [180, 0.55]].forEach(([dx, k], i) => add({ type: "flower", x: kx + dx, air: h * k, hue: i }));
+    for (const [kx] of KICKERS) { // along the arc of a jump at normal speed
+      const th = lipAngle(kx), V = 400;
+      let x = kx, y = gy(kx), vx = V * Math.cos(th), vy = V * Math.sin(th) - POP, t = 0, i = 0;
+      const marks = [0.3, 0.55, 0.8, 1.05];
+      while (i < marks.length && t < 2) {
+        vy += G_AIR / 60; x += vx / 60; y += vy / 60; t += 1 / 60;
+        if (t >= marks[i]) { if (by(x) - y > 45) add({ type: "flower", x, y: y - 20, hue: i % 3 }); i++; }
+      }
     }
     // Snickers = fuel
     for (let x = 1300; x < FINISH - 600; x += 2000) add({ type: "snickers", x });
@@ -155,7 +178,8 @@ const KenoshaLevel = (() => {
     if (!s.air) {
       const th = Math.atan(slope(s.x));       // >0 downhill, <0 uphill
       const icy = s.x > STEEP[0] && s.x < STEEP[1];
-      let a = G * Math.sin(th) - 0.3 * s.sp;
+      const ramp = rampAt(s.x);
+      let a = G * Math.sin(th) * (ramp ? 0.2 : 1) - 0.3 * s.sp; // ramps don't eat your speed
       if (gas) a += ACCEL * (icy ? 0.95 : 1);
       if (brake) {
         if (s.sp > 25) a -= 950;
@@ -165,7 +189,7 @@ const KenoshaLevel = (() => {
       if (brake && s.sp < 25 && s.sp > -25) s.sp = 0;
       // too much gas on a steep climb lifts the nose... and eventually flips you
       const up = -th;
-      if (gas && up > 0.3 && s.sp > -10) s.w += (up - 0.3) * 2.0 * dt;
+      if (gas && up > 0.3 && s.sp > -10 && !ramp) s.w += (up - 0.3) * 2.0 * dt;
       else s.w = Math.max(0, s.w - 3.5 * dt);
       if (s.w > 0.7 && s.t - (s.warnAt || -99) > 6) { s.warnAt = s.t; Engine.toast(L.easyGas, "bad"); }
       if (s.w > 1.25) return flip();
@@ -174,21 +198,33 @@ const KenoshaLevel = (() => {
       s.vx = s.sp * dx; s.vy = s.sp * dy;
       const nx = s.x + s.vx * dt;
       const fly = s.y + s.vy * dt + 0.5 * G * dt * dt;
-      if (s.sp > 140 && gy(nx) > fly + 1.5) { // the ground drops away faster than you fall: airborne
+      const offLip = ramp && s.x < ramp[0] && nx >= ramp[0] && s.sp > 120;
+      if (offLip || (s.sp > 140 && gy(nx) > fly + 1.5)) { // off a ramp, or the ground drops away: airborne
         s.air = true;
         s.ang = th - s.w; s.w = 0; s.av = 0;
         s.x = nx; s.y += s.vy * dt;
+        if (offLip) { // leave at the ramp's real angle, plus a pop
+          const la = lipAngle(ramp[0]);
+          s.vx = s.sp * Math.cos(la); s.vy = s.sp * Math.sin(la) - POP;
+          s.ang = la; s.x = ramp[0]; s.y = gy(ramp[0] - 2);
+          Sfx.boost();
+        }
       } else {
         s.x = nx; s.y = gy(nx);
         s.ang = Math.atan(slope(nx)) - s.w;
       }
     } else {
-      s.vy += G * dt;
+      s.vy += G_AIR * dt;
       s.x += s.vx * dt; s.y += s.vy * dt;
+      // The car steadies itself toward the slope it's about to land on; the buttons only lean it
+      // (gas = nose up, brake = nose down). Holding gas the whole jump is safe. A missed
+      // HOOK THE TOE mid-air (big spin) is what gets you.
       const tilt = (gas || (s.state === "drive" && Engine.input.right) ? -1 : 0) + (brake ? 1 : 0);
-      if (tilt) s.av += tilt * 9 * dt;
-      else s.av += (0.5 - s.av) * Math.min(1, dt * 2); // nose drifts gently down
-      s.av = clamp(s.av, -4.5, 4.5);
+      const target = Math.atan(slope(s.x + s.vx * 0.25)) + tilt * 0.7;
+      const diff = Math.atan2(Math.sin(target - s.ang), Math.cos(target - s.ang));
+      if (s.spinT > 0) s.spinT -= dt;
+      else s.av += (diff * 7 - s.av * 3) * dt;
+      s.av = clamp(s.av, -7, 7);
       s.ang += s.av * dt;
       if (s.y >= gy(s.x)) land();
     }
@@ -206,6 +242,7 @@ const KenoshaLevel = (() => {
     s.sp = s.vx * dx + s.vy * dy;
     s.air = false; s.av = 0; s.w = 0; s.ang = th;
     if (impact > 450) { Engine.shake = Math.min(8, impact / 90); Sfx.noise(0.12, 0.25); }
+    if (Math.abs(diff) > 0.55) s.sp *= 0.8; // sloppy landing costs a little speed
   }
 
   function flip() {
@@ -248,7 +285,7 @@ const KenoshaLevel = (() => {
     // the worst possible moment: in the middle of the big jump
     if (!s.flags.bigToe && s.air && s.x > BIG_JUMP - 30 && s.x < BIG_JUMP + 500) {
       s.flags.bigToe = true;
-      if (!ToePrompt.active) startToe(1.8);
+      if (!ToePrompt.active) startToe(1.1);
     }
     if (!s.flags.rv && s.x > RV.start - 900) {
       s.flags.rv = true;
@@ -274,7 +311,7 @@ const KenoshaLevel = (() => {
   function startToe(win) {
     ToePrompt.start((ok) => {
       if (ok) s.toes++;
-      else if (s.air) s.av += 5;           // missed it mid-air: the car spins
+      else if (s.air) { s.av = 10; s.spinT = 0.5; } // missed it mid-air: half a second of helpless spinning
       else s.sp *= 0.5;
     }, win);
   }
@@ -395,7 +432,7 @@ const KenoshaLevel = (() => {
     const cy = s.y - 26; // middle of the car
     for (const o of s.objs) {
       if (o.got) continue;
-      const oy = o.type === "charm" ? gy(o.x) - 70 : gy(o.x) - 22 - (o.air || 0);
+      const oy = o.type === "charm" ? gy(o.x) - 70 : o.y !== undefined ? o.y : gy(o.x) - 22;
       if (Math.abs(o.x - s.x) > 40 || Math.abs(oy - cy) > 46) continue;
       o.got = true;
       if (o.type === "flower") { s.flowers++; Sfx.flower(); }
@@ -438,7 +475,7 @@ const KenoshaLevel = (() => {
       const a = hash(i, 3);
       if (a < 0.45) continue;
       const tx = i * 70 + hash(i, 4) * 40;
-      const ty = gy(tx) + 4;
+      const ty = by(tx) + 4;
       if (tx > SUMMIT - 300 && tx < SUMMIT + 300) continue;
       if (a < 0.75) Art.aspen(ctx, tx, ty, 70 + hash(i, 5) * 50, i);
       else Art.pine(ctx, tx, ty, 50 + hash(i, 6) * 40);
@@ -446,19 +483,20 @@ const KenoshaLevel = (() => {
 
     // the mountain itself: snow, dirt, road
     ctx.beginPath(); ctx.moveTo(x0, bottom);
-    for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, gy(x));
+    for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, by(x));
     ctx.lineTo(x1, bottom); ctx.closePath();
     ctx.fillStyle = "#f4f7fb"; ctx.fill();
     ctx.beginPath(); ctx.moveTo(x0, bottom);
-    for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, gy(x) + 34);
+    for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, by(x) + 34);
     ctx.lineTo(x1, bottom); ctx.closePath();
     ctx.fillStyle = "#7d6b5a"; ctx.fill();
     ctx.beginPath();
-    for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, gy(x) + 6);
+    for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, by(x) + 6);
     ctx.strokeStyle = "#3d4452"; ctx.lineWidth = 12; ctx.stroke();
     ctx.beginPath();
-    for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, gy(x) + 1);
+    for (let x = x0; x <= x1; x += 8) (x === x0 ? ctx.moveTo : ctx.lineTo).call(ctx, x, by(x) + 1);
     ctx.strokeStyle = "#e9ecef"; ctx.lineWidth = 2; ctx.stroke();
+    for (const [kx, h] of KICKERS) if (kx > x0 - 50 && kx - RAMP_LEN - 120 < x1) drawRamp(ctx, kx, h);
     // ice on the steep part
     if (x1 > STEEP[0] && x0 < STEEP[1]) {
       ctx.beginPath();
@@ -476,7 +514,7 @@ const KenoshaLevel = (() => {
     }
 
     // signs + checkpoints
-    L.signs.forEach((txt, i) => { const x = SIGN_X[i]; if (x > x0 - 100 && x < x1 + 100) Art.postSign(ctx, x, gy(x), txt); });
+    L.signs.forEach((txt, i) => { const x = SIGN_X[i]; if (x > x0 - 100 && x < x1 + 100) Art.postSign(ctx, x, by(x), txt); });
     if (FALSE_SUMMIT > x0 - 100 && FALSE_SUMMIT < x1 + 100) Art.postSign(ctx, FALSE_SUMMIT + 60, gy(FALSE_SUMMIT + 60), L.falseSummitSign, "#e63946");
     if (SUMMIT > x0 - 200 && SUMMIT < x1 + 200) {
       Art.postSign(ctx, SUMMIT - 120, gy(SUMMIT - 120), L.summitSign, "#6b4f2a");
@@ -500,7 +538,7 @@ const KenoshaLevel = (() => {
     // collectibles
     for (const o of s.objs) {
       if (o.got || o.x < x0 - 50 || o.x > x1 + 50) continue;
-      const oy = gy(o.x) - 22 - (o.air || 0);
+      const oy = o.y !== undefined ? o.y : gy(o.x) - 22;
       if (o.type === "flower") Art.flower(ctx, o.x, oy, s.t, o.hue);
       else if (o.type === "snickers") { ctx.save(); ctx.translate(o.x, oy); ctx.scale(0.75, 0.75); Art.snickers(ctx, 0, 0, s.t); ctx.restore(); }
       else if (o.type === "charm") {
@@ -554,6 +592,30 @@ const KenoshaLevel = (() => {
     vanWarning(ctx, z);
     Confetti.draw(ctx);
     ctx.restore();
+  }
+
+  // Wooden jump ramp with a warning sign before it
+  function drawRamp(ctx, kx, h) {
+    const start = kx - RAMP_LEN;
+    ctx.beginPath();
+    for (let x = start; x <= kx + 40; x += 5) ctx.lineTo(x, gy(x));
+    for (let x = kx + 40; x >= start; x -= 5) ctx.lineTo(x, by(x) + 2);
+    ctx.closePath();
+    ctx.fillStyle = "#b07d48"; ctx.fill();
+    ctx.strokeStyle = "#7a5230"; ctx.lineWidth = 2;
+    for (let x = start + 40; x < kx; x += 32) { ctx.beginPath(); ctx.moveTo(x, gy(x)); ctx.lineTo(x, by(x)); ctx.stroke(); }
+    ctx.beginPath();
+    for (let x = start; x <= kx; x += 5) ctx.lineTo(x, gy(x));
+    ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = 4; ctx.stroke();
+    // yellow warning diamond
+    const sx = start - 70, sy = by(sx);
+    ctx.fillStyle = "#555"; ctx.fillRect(sx - 1.5, sy - 46, 3, 46);
+    ctx.save(); ctx.translate(sx, sy - 58); ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = "#ffd23f"; ctx.fillRect(-13, -13, 26, 26);
+    ctx.strokeStyle = "#1b1f2e"; ctx.lineWidth = 2; ctx.strokeRect(-11, -11, 22, 22);
+    ctx.restore();
+    ctx.fillStyle = "#1b1f2e"; ctx.font = "800 18px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("↗", sx, sy - 58);
   }
 
   function drawCar(ctx) {
