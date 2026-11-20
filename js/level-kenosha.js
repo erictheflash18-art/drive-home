@@ -516,7 +516,7 @@ const KenoshaLevel = (() => {
     const quiet = (s.x > RV.start - 900 && s.x < RV.end) || (s.x > STEEP[0] - 300 && s.x < SUMMIT + 400) || s.x < 1500;
     if (s.state === "drive" && !quiet) {
       s.nextSkier -= dt;
-      if (s.nextSkier <= 0) { s.nextSkier = rand(4.5, 8); spawnSkier(); }
+      if (s.nextSkier <= 0) { s.nextSkier = rand(6.5, 10); spawnSkier(); }
     }
     for (const k of s.skiers) {
       k.t += dt;
