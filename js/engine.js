@@ -64,7 +64,9 @@ const Engine = {
 
   bindInput() {
     const keyMap = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right" };
+    const typing = (e) => e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
     window.addEventListener("keydown", (e) => {
+      if (typing(e) || !this.level) return; // typing a save code, or on the map
       if (keyMap[e.key]) { this.input[keyMap[e.key]] = true; e.preventDefault(); }
       if (e.key === " " || e.key === "Enter" || e.key === "t" || e.key === "T") {
         e.preventDefault();

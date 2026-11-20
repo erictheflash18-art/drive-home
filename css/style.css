@@ -253,3 +253,24 @@ h1 { font-size: 28px; line-height: 1.1; margin: 10px 0 6px; color: var(--gold); 
 .bday { margin: 10px auto 0; display: inline-block; background: var(--pink); color: #fff; font-weight: 800;
   font-size: 18px; padding: 4px 16px; border-radius: 999px; box-shadow: 0 3px 0 #a3367a; }
 .sound-hint { margin: 8px 0 0; font-size: 14px; opacity: .7; }
+
+/* ================= SAVE CODE ================= */
+.savebox {
+  width: 100%; max-width: 440px; margin-top: 12px; background: rgba(255,255,255,.06);
+  border-radius: 16px; padding: 10px 16px; -webkit-user-select: text; user-select: text;
+}
+.savebox summary { cursor: pointer; font-weight: 800; font-size: 17px; }
+.savebox p { margin: 8px 0; font-size: 14px; opacity: .85; line-height: 1.35; }
+.save-row { display: flex; gap: 8px; }
+.save-row input {
+  flex: 1; min-width: 0; font-family: ui-monospace, Menlo, monospace; font-size: 14px; padding: 8px 10px;
+  border-radius: 10px; border: 2px solid #4d6aa3; background: var(--night); color: var(--cream);
+  -webkit-user-select: text; user-select: text;
+}
+.small-btn {
+  border: 0; border-radius: 999px; padding: 6px 16px; background: var(--teal); color: #fff;
+  font-size: 15px; font-weight: 800; white-space: nowrap;
+}
+.load-help { margin-top: 12px !important; }
+.save-msg.ok { color: var(--teal); font-weight: 700; opacity: 1; }
+.save-msg.bad { color: #ff8a95; font-weight: 700; opacity: 1; }

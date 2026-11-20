@@ -7,6 +7,7 @@ const Game = {
     $("title").textContent = LINES.title;
     $("subtitle").textContent = LINES.subtitle;
     $("soundHint").textContent = LINES.soundHint;
+    this.initSaveBox();
     $("mascot").innerHTML = PENGUIN_SVG;
     document.querySelector(".feet-art").innerHTML = FEET_SVG;
     document.querySelector(".dialog-peng").innerHTML = PENGUIN_SVG;
@@ -17,6 +18,31 @@ const Game = {
     Engine.init();
     this.renderMap();
     setInterval(() => { if ($("map").classList.contains("active")) this.renderMap(); }, 1000);
+  },
+
+  initSaveBox() {
+    $("saveTitle").textContent = LINES.saveTitle;
+    $("saveHelp").textContent = LINES.saveHelp;
+    $("copyCode").textContent = LINES.copyButton;
+    $("loadHelp").textContent = LINES.loadHelp;
+    $("loadBtn").textContent = LINES.loadButton;
+    $("copyCode").addEventListener("click", async () => {
+      const box = $("saveCode");
+      box.value = Save.exportCode();
+      try { await navigator.clipboard.writeText(box.value); }
+      catch (e) { box.focus(); box.select(); document.execCommand && document.execCommand("copy"); }
+      $("copyCode").textContent = LINES.copied;
+      setTimeout(() => ($("copyCode").textContent = LINES.copyButton), 1800);
+    });
+    $("saveCode").addEventListener("focus", (e) => e.target.select());
+    const load = () => {
+      const ok = Save.importCode($("loadCode").value);
+      $("saveMsg").textContent = ok ? LINES.loadedOk : LINES.loadedBad;
+      $("saveMsg").className = "save-msg " + (ok ? "ok" : "bad");
+      if (ok) { $("loadCode").value = ""; this.renderMap(); }
+    };
+    $("loadBtn").addEventListener("click", load);
+    $("loadCode").addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
   },
 
   show(id) {
@@ -54,6 +80,7 @@ const Game = {
     ol.querySelectorAll(".play").forEach((b) => b.addEventListener("click", () => this.play(b.dataset.id)));
 
     $("bday").textContent = birthdayText(now);
+    if (document.activeElement !== $("saveCode")) $("saveCode").value = Save.exportCode();
     const t = Save.totals();
     $("flowerTotal").textContent = t.flowers;
     $("toeTotal").textContent = t.toes;

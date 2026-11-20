@@ -7,6 +7,7 @@ const VOICE_SKIP = new Set([
   "title", "subtitle", "soundHint", "lockedText", "name", "signs", "devilsThumbSign", "floodSign",
   "backSign", "finalSign", "toePrompt", "comingSoon",
   "birthdayCountdown", "birthdayTomorrow", "birthdayToday",
+  "saveTitle", "saveHelp", "copyButton", "copied", "loadHelp", "loadButton", "loadedOk", "loadedBad",
 ]);
 
 const Voice = {

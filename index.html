@@ -27,6 +27,20 @@
       <div class="loot-row"><span>Cars totalled</span><b id="carTotal">0</b><span>💥</span></div>
       <div class="bracelet" id="bracelet"></div>
     </div>
+    <details class="savebox" id="savebox">
+      <summary id="saveTitle"></summary>
+      <p id="saveHelp"></p>
+      <div class="save-row">
+        <input id="saveCode" readonly aria-label="Your save code">
+        <button id="copyCode" class="small-btn"></button>
+      </div>
+      <p id="loadHelp" class="load-help"></p>
+      <div class="save-row">
+        <input id="loadCode" placeholder="YOJOHN-..." aria-label="Paste a save code" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button id="loadBtn" class="small-btn"></button>
+      </div>
+      <p id="saveMsg" class="save-msg"></p>
+    </details>
   </section>
 
   <!-- ============ GAME SCREEN ============ -->

@@ -18,6 +18,16 @@ const LINES = {
   birthdayTomorrow: "🎂 The birthday is TOMORROW",
   birthdayToday: "🎂 IT'S THE BIRTHDAY!",
 
+  // Save code box on the map
+  saveTitle: "💾 Save code",
+  saveHelp: "Your progress lives on this device. Copy this code and keep it somewhere safe (text it to yourself). It brings your progress back on any phone or computer.",
+  copyButton: "Copy",
+  copied: "Copied!",
+  loadHelp: "Got a code? Paste it here:",
+  loadButton: "Load",
+  loadedOk: "YO JOHN, progress restored.",
+  loadedBad: "YO JOHN, that code doesn't look right. Check you copied the whole thing.",
+
   // Shown under each stop on the map before it opens
   lockedText: "YO JOHN, not yet. Opens",
 
