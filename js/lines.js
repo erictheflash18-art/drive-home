@@ -95,7 +95,7 @@ const LINES = {
       "We're going back to the gas station.",
     ],
     backSign: "YO JOHN, gas station: back that way (ugh)",
-    missedSnickers: "YO JOHN, you drove right past the Snickers. Again.",
+    missedSnickers: "YO, you drove right past the Snickers. Again.",
     gotSnickers: "YO JOHN, SNICKERS ACQUIRED. You found the Snickers charm for your bracelet!",
 
     // The frat guys show up for the last stretch
