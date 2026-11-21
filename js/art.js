@@ -321,7 +321,7 @@ const Art = {
     this.rr(ctx, -21, -24, 42, 60, 6); ctx.fill();
     ctx.fillStyle = "#7b1e3a";
     ctx.font = "800 17px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("ΒΡΟ", 0, 6);
+    ctx.fillText("ΣΤΓ", 0, 6);
     // headlights + flashing party light
     ctx.fillStyle = "#fff6c2";
     ctx.fillRect(-23, -48, 9, 4); ctx.fillRect(14, -48, 9, 4);
@@ -442,7 +442,7 @@ const Art = {
     ctx.beginPath(); ctx.moveTo(46, -50); ctx.lineTo(58, -32); ctx.lineTo(58, -14); ctx.lineTo(46, -14); ctx.fill();
     ctx.fillStyle = "#9cc5de"; this.rr(ctx, 30, -58, 18, 18, 3); ctx.fill();
     ctx.fillStyle = "#f1e3c8"; ctx.font = "800 20px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("ΒΡΟ", -10, -40);
+    ctx.fillText("ΣΤΓ", -10, -40);
     const flash = Math.floor(t * 6) % 2;
     ctx.fillStyle = flash ? "#ff006e" : "#3a86ff";
     ctx.beginPath(); ctx.arc(-6, -70, 5, 0, Math.PI * 2); ctx.fill();

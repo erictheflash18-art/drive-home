@@ -21,7 +21,6 @@ const KenoshaLevel = (() => {
   const STEP = 10;            // terrain sample spacing (px)
   const FINISH = 28000;
   const SUMMIT = 19300;
-  const FALSE_SUMMIT = 15450;
   const STEEP = [15800, 18300];
   const PUDDLE = [4480, 4720];
   const RV = { start: 7400, end: 9750, speed: 125 };
@@ -363,7 +362,6 @@ const KenoshaLevel = (() => {
       Engine.toast(pick(LINES.waterCold), "water");
       s.shrinkT = 3.4; s.smallPending = true;
     }
-    if (!s.flags.falseSummit && s.x >= FALSE_SUMMIT) falseSummit();
     if (!s.flags.steep && s.x >= STEEP[0] + 60) { s.flags.steep = true; Engine.toast(L.steepWarning); }
     if (s.fuel < 25 && !s.lowFuelWarned) { s.lowFuelWarned = true; Engine.toast(L.lowFuel, "bad"); }
     if (s.fuel >= 40) s.lowFuelWarned = false;
@@ -391,25 +389,6 @@ const KenoshaLevel = (() => {
     if (me.dead) return;
     s.hangry = false;
     s.fuel = 100;
-  }
-
-  async function falseSummit() {
-    const me = s;
-    s.flags.falseSummit = true;
-    s.state = "stopping";
-    ToePrompt.cancel();
-    Sfx.fanfare();
-    Confetti.burst(120, Engine.W);
-    Engine.banner(L.falseSummitBanner);
-    await wait(2400);
-    if (me.dead) return;
-    Sfx.scratch();
-    Engine.hideBanner();
-    Confetti.bits = [];
-    await Engine.say(L.falseSummit);
-    if (me.dead) return;
-    s.state = "drive";
-    s.nextToe = rand(8, 12);
   }
 
   async function gotCharm() {
@@ -646,7 +625,6 @@ const KenoshaLevel = (() => {
 
     // signs + checkpoints
     L.signs.forEach((txt, i) => { const x = SIGN_X[i]; if (x > x0 - 100 && x < x1 + 100) Art.postSign(ctx, x, by(x), txt); });
-    if (FALSE_SUMMIT > x0 - 100 && FALSE_SUMMIT < x1 + 100) Art.postSign(ctx, FALSE_SUMMIT + 60, gy(FALSE_SUMMIT + 60), L.falseSummitSign, "#e63946");
     if (SUMMIT > x0 - 200 && SUMMIT < x1 + 200) {
       Art.postSign(ctx, SUMMIT - 120, gy(SUMMIT - 120), L.summitSign, "#6b4f2a");
       Art.postSign(ctx, SUMMIT + 150, gy(SUMMIT + 150), L.trailSign, "#5c4033");
@@ -828,7 +806,7 @@ const KenoshaLevel = (() => {
     ctx.fillStyle = close && Math.floor(s.t * 6) % 2 ? "#e63946" : "#7b1e3a";
     Art.rr(ctx, 4, y - 18, 112, 36, 12); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.font = "800 15px 'Baloo 2', sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    ctx.fillText("◀ ΒΡΟ " + gap + "m", 14, y + 1);
+    ctx.fillText("◀ ΣΤΓ " + gap + "m", 14, y + 1);
   }
 
   function fuelGauge(ctx) {

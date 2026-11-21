@@ -172,12 +172,6 @@ const LINES = {
       "YO JOHN, SEND IT, said the skier. Into you.",
     ],
     skierYell: "SEND IT!",
-    falseSummitSign: "SUMMIT!",
-    falseSummitBanner: "YOU MADE IT TO THE TOP!",
-    falseSummit: [
-      "YO JOHN... that was a false summit.",
-      "Classic Colorado. The real top is up there.",
-    ],
     steepWarning: "YO JOHN, it's icy. Easy on the gas or you'll flip.",
     easyGas: "YO JOHN, EASY ON THE GAS.",
     flipped: [
