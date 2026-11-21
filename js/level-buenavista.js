@@ -5,17 +5,20 @@
 
 const BuenaVistaLevel = (() => {
   const L = LINES.buenaVista;
-  const FINISH = 17000;
-  const CURRENT = 165, RAPID_CURRENT = 245;
-  const RAPIDS = [[2500, 3600, 0], [6000, 7400, 1], [11000, 12600, 2]]; // [start, end, sign index]
+  const FINISH = 18800;
+  const CURRENT = 165, RAPID_CURRENT = 245, LAZY_CURRENT = 110;
+  const RAPIDS = [[2500, 3600, 0], [7000, 8400, 1], [12000, 13600, 2]]; // [start, end, sign index]
   const HARD_RAPID = 2;              // Raft Ripper: narrow and rocky
-  const PUSHERS = [3900, 8900, 13300];
-  const BOTTLES = [5000, 10000, 14300];
-  const GRANDPARENTS = 8200;
-  const RAIN_STOPS = 14800;
-  const CHARM = 15700;
+  const PUSHERS = [3900, 8800, 14000];
+  const BOTTLES = [6400, 11400, 16400];
+  // A slow, wide, empty lazy-river stretch before each bottle: a natural pause for the memory
+  const LAZY = BOTTLES.map((b) => [b - 1250, b + 150]);
+  const GRANDPARENTS = 9800;
+  const RAIN_STOPS = 16700;
+  const CHARM = 17500;
   const RAFT_R = 30;
-  const BEERS = [1500, 4400, 5500, 8000, 9500, 13800]; // calm water only
+  // Beer. Lots of beer. (calm water, not in the lazy stretches)
+  const BEERS = [900, 1500, 2100, 4300, 4800, 6800, 9300, 9900, 11800, 14200, 14700, 15000, 16900, 17200];
 
   let s;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -23,9 +26,11 @@ const BuenaVistaLevel = (() => {
 
   // ---------- The river ----------
   const inRapid = (wy) => RAPIDS.find(([a, b]) => wy > a && wy < b);
+  const inLazy = (wy) => LAZY.find(([a, b]) => wy > a && wy < b);
+  const lazyAmount = (wy) => { const z = inLazy(wy); return z ? Math.min(1, (wy - z[0]) / 300, (z[1] - wy) / 150) : 0; };
   function cx(wy) { return Engine.W / 2 + 55 * Math.sin(wy / 900) + 28 * Math.sin(wy / 377 + 1); }
   function width(wy) {
-    let w = 270 + 30 * Math.sin(wy / 1300);
+    let w = 270 + 30 * Math.sin(wy / 1300) + 40 * lazyAmount(wy);
     const r = inRapid(wy);
     if (r) {
       const edge = Math.min(1, (wy - r[0]) / 300, (r[1] - wy) / 300);
@@ -35,6 +40,8 @@ const BuenaVistaLevel = (() => {
   }
   function banks(wy) { const c = cx(wy), w = width(wy); return [c - w / 2, c + w / 2]; }
   function current(wy) {
+    const lz = lazyAmount(wy);
+    if (lz > 0) return CURRENT + (LAZY_CURRENT - CURRENT) * lz;
     const r = inRapid(wy);
     if (!r) return CURRENT;
     const edge = Math.min(1, (wy - r[0]) / 250, (r[1] - wy) / 250);
@@ -62,6 +69,7 @@ const BuenaVistaLevel = (() => {
     const add = (o) => s.objs.push(o);
     // rocks: sparse in calm water, rows with a guaranteed gap in the rapids
     for (let wy = 900; wy < FINISH - 1200; wy += 120) {
+      if (inLazy(wy) || inLazy(wy + 200)) continue;
       const r = inRapid(wy);
       const [l, rt] = banks(wy);
       if (r) {
@@ -159,12 +167,12 @@ const BuenaVistaLevel = (() => {
   }
 
   function events(dt) {
-    if (!ToePrompt.active) {
+    if (!ToePrompt.active && !inLazy(s.dist)) {
       s.nextToe -= dt;
       if (s.nextToe <= 0) { startToe(); s.nextToe = rand(12, 18); }
     }
     // the middle of Zoom Flume: worst possible moment
-    if (!s.flags.flumeToe && s.dist > 6700) { s.flags.flumeToe = true; if (!ToePrompt.active) startToe(1.8); }
+    if (!s.flags.flumeToe && s.dist > (RAPIDS[1][0] + RAPIDS[1][1]) / 2 && s.dist < RAPIDS[1][1]) { s.flags.flumeToe = true; if (!ToePrompt.active) startToe(1.8); }
     for (const [a] of RAPIDS) if (!s.flags["r" + a] && s.dist > a - 450) { s.flags["r" + a] = true; Engine.toast(L.rapidWarning); }
     PUSHERS.forEach((wy, i) => { if (!s.flags["p" + i] && s.dist > wy) { s.flags["p" + i] = true; spawnPusher(i); } });
     if (!s.flags.gp && s.dist > GRANDPARENTS) { s.flags.gp = true; s.gp = 0; Engine.toast(L.grandparents); }
@@ -216,7 +224,7 @@ const BuenaVistaLevel = (() => {
       p.x = clamp(p.x, l + RAFT_R, rt - RAFT_R);
       p.taunt -= dt;
       if (p.taunt <= 0 && p.phase === "approach" && Math.abs(dy) < 300) { p.taunt = rand(3, 4.5); Engine.toast(pick(L.pusherTaunts)); }
-      if (p.t > 14 && !p.done) { p.done = true; Engine.toast(L.pusherGiveUp, "good"); }
+      if ((p.t > 14 || inLazy(s.dist)) && !p.done) { p.done = true; Engine.toast(L.pusherGiveUp, "good"); } // the calm stretches are Chad-free
     } else {
       p.fade += dt * 0.7;
       p.wy += (yours - 90) * dt; // drifts back and away
