@@ -165,6 +165,9 @@ const LINES = {
       "YO JOHN, you rammed the RV.",
       "YO JOHN, the RV is smoking. One more.",
     ],
+    rvHint: "YO JOHN... I bet that RV can't take a hit.",
+    rvSurvived: "RV survived",
+    rvDestroyed: "RV destroyed",
     rvBoom: [
       "YO JOHN, YOU BLEW UP THE RV.",
       "Don't worry. The grandparents parachuted out.",

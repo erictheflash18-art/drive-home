@@ -107,8 +107,19 @@ const Game = {
     $("cFlowers").textContent = d.flowers;
     $("cToes").textContent = d.toes;
     $("cCharm").textContent = d.charm;
-    $("cBikes").textContent = d.bikesHit || 0;
-    $("cCars").textContent = d.carsTotalled || 0;
+    // level-specific stats: [{ icon, value, label }]
+    const extra = d.extra || [
+      { icon: "🚲", value: d.bikesHit || 0, label: "bikes hit" },
+      { icon: "💥", value: d.carsTotalled || 0, label: "cars totalled" },
+    ];
+    $("cExtra").innerHTML = "";
+    for (const st of extra) {
+      const el = document.createElement("div");
+      el.innerHTML = `${st.icon} <b></b><small></small>`;
+      el.querySelector("b").textContent = st.value;
+      el.querySelector("small").textContent = st.label;
+      $("cExtra").appendChild(el);
+    }
     $("completeNote").textContent = d.note;
     Voice.play(d.note, "interrupt");
     $("complete").classList.add("show");

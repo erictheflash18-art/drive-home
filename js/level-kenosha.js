@@ -425,7 +425,11 @@ const KenoshaLevel = (() => {
     Game.showComplete({
       title: L.completeTitle,
       flowers: s.flowers, toes: s.toes, charm: "🚲", charmName: "Bike",
-      bikesHit: 0, carsTotalled: s.carsTotalled,
+      extra: [
+        { icon: "⛷️", value: s.skiersHit || 0, label: "skiers hit" },
+        { icon: "💥", value: s.carsTotalled, label: "cars totalled" },
+        s.rv.exploded ? { icon: "🔥", value: "💥", label: L.rvDestroyed } : { icon: "🚐", value: "✓", label: L.rvSurvived },
+      ],
       note: L.note,
     });
   }
@@ -437,6 +441,10 @@ const KenoshaLevel = (() => {
       r.x += RV.speed * dt;
       r.wheel = (r.wheel || 0) + RV.speed * dt / 12;
       if (r.x >= RV.end) { r.pulled = true; Engine.toast(L.rvGone, "good"); return; }
+      if (s.state === "drive" && s.x > r.x - 550 && !r.rams) { // hanging back behind it without ramming
+        r.stuckT = (r.stuckT || 0) + dt;
+        if (r.stuckT > 7 && !r.hinted) { r.hinted = true; Engine.toast(L.rvHint); }
+      }
       if (s.state === "drive" && s.x > r.x - 450) {
         r.taunt -= dt;
         if (r.taunt <= 0) { r.taunt = rand(5, 7); Sfx.honk(); Engine.toast(pick(L.rvTaunts)); }
@@ -597,6 +605,7 @@ const KenoshaLevel = (() => {
       t: 0, rot: rand(-0.3, 0.3), spin: rand(-1.2, 1.2), color: pick(SKIER_COLORS), hit: false });
   }
   function hitBySkier(k) {
+    s.skiersHit = (s.skiersHit || 0) + 1;
     k.hit = true; k.vx = 180; k.vy = -260; k.spin = 14;
     if (s.onVeh) { s.onVeh = null; s.air = true; }
     s.av = 4; s.spinT = 0.12; s.vy = Math.max(s.vy, 260); s.vx *= 0.7; // knocked down, a little wobble
