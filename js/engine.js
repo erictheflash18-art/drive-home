@@ -14,6 +14,7 @@ const Engine = {
   paused: false,
   dialogOpen: false,
   input: { left: false, right: false, up: false },
+  presses: { left: 0, right: 0, up: 0 }, // every tap counts, even ones shorter than a frame
   onToe: null,
 
   init() {
@@ -75,7 +76,10 @@ const Engine = {
     const typing = (e) => e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
     window.addEventListener("keydown", (e) => {
       if (typing(e) || !this.level) return; // typing a save code, or on the map
-      if (keyMap[e.key]) { this.input[keyMap[e.key]] = true; e.preventDefault(); }
+      if (keyMap[e.key]) {
+        if (!e.repeat) this.presses[keyMap[e.key]]++;
+        this.input[keyMap[e.key]] = true; e.preventDefault();
+      }
       if (e.key === " " || e.key === "Enter" || e.key === "t" || e.key === "T") {
         e.preventDefault();
         if (e.repeat) return;
@@ -87,7 +91,7 @@ const Engine = {
       if (keyMap[e.key]) this.input[keyMap[e.key]] = false;
     });
     const hold = (el, key) => {
-      const on = (e) => { e.preventDefault(); this.input[key] = true; el.classList.add("down"); Sfx.unlock(); };
+      const on = (e) => { e.preventDefault(); this.presses[key]++; this.input[key] = true; el.classList.add("down"); Sfx.unlock(); };
       const off = (e) => { e.preventDefault(); this.input[key] = false; el.classList.remove("down"); };
       el.addEventListener("pointerdown", on);
       el.addEventListener("pointerup", off);
@@ -106,6 +110,7 @@ const Engine = {
       Sfx.muted = !Sfx.muted;
       $("muteBtn").textContent = Sfx.muted ? "🔇" : "🔊";
       if (Sfx.muted) Voice.stop();
+      if (Sfx.rain) Sfx.rain.g.gain.value = Sfx.muted ? 0 : 0.05;
     });
   },
 
@@ -265,6 +270,30 @@ const Sfx = {
   boost() { this.tone(300, 0.4, "sawtooth", 0.07, 0, 1200); },
   fanfare() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => this.tone(f, 0.18, "triangle", 0.13, i * 0.12)); },
   devils() { [392, 466, 523, 466, 392, 311].forEach((f, i) => this.tone(f, 0.11, "square", 0.06, i * 0.08)); },
+  // Soft rain: filtered noise on a loop
+  rainStart(vol) {
+    if (!this.ac || this.rain) return;
+    const len = this.ac.sampleRate * 2;
+    const buf = this.ac.createBuffer(1, len, this.ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = this.ac.createBufferSource(); src.buffer = buf; src.loop = true;
+    const f = this.ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 1400;
+    const g = this.ac.createGain(); g.gain.value = 0;
+    g.gain.linearRampToValueAtTime(this.muted ? 0 : (vol || 0.05), this.ac.currentTime + 1.5);
+    src.connect(f).connect(g).connect(this.ac.destination);
+    src.start();
+    this.rain = { src, g };
+  },
+  rainStop(fade) {
+    if (!this.rain) return;
+    const { src, g } = this.rain;
+    const t = this.ac.currentTime;
+    g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.linearRampToValueAtTime(0, t + (fade || 0.3));
+    src.stop(t + (fade || 0.3) + 0.05);
+    this.rain = null;
+  },
   boom() {
     this.noise(1.4, 0.8);
     this.tone(70, 1.2, "sawtooth", 0.25, 0, 30);

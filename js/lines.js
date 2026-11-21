@@ -216,7 +216,52 @@ const LINES = {
     completeTitle: "YO JOHN, KENOSHA PASS: CONQUERED.",
     note: "YO JOHN, (Placeholder: write your Day 2 note here!)",
   },
-  buenaVista: { name: "Buena Vista" },
+  // ---------------- LEVEL 3: BUENA VISTA (rafting) ----------------
+  buenaVista: {
+    name: "Buena Vista",
+    intro: [
+      "YO JOHN, the car is done. One RV explosion was too many.",
+      "So we're rafting the Arkansas River the rest of the way to Buena Vista. You love rafting.",
+      "Tap the left and right buttons to paddle. Alternate them to go faster. Dodge the rocks.",
+      "Just... stay IN the raft. THE WATER IS COLD.",
+      "3 days till my birthday.",
+    ],
+    signs: ["Pinball Rapid", "Zoom Flume", "Raft Ripper", "Welcome to Buena Vista"],
+    rapidWarning: "YO JOHN, RAPIDS. Hold on to something.",
+    rockHit: [
+      "YO JOHN, that was a rock.",
+      "YO JOHN, the river has rocks in it. Who knew.",
+      "YO JOHN, the raft is fine. Probably.",
+    ],
+    pusherAppear: [
+      "YO JOHN, it's Chad from ΣΤΓ. He's paddling over.",
+      "YO JOHN, Chad is back. Paddle away from Chad.",
+      "YO JOHN, CHAD AGAIN. He does not give up.",
+    ],
+    pusherTaunts: [
+      "Chad: JUST HOP IN, IT'S REFRESHING!",
+      "Chad: Come on, the water's not even that cold!",
+      "Chad: You love rafting! Rafting is basically swimming!",
+    ],
+    pushedIn: "Chad pushed you in.",
+    pusherWindup: "YO JOHN, CHAD IS WINDING UP. MOVE.",
+    pusherGiveUp: "Chad: ...fine. Next time.",
+    grandparents: "YO JOHN, the RV grandparents are STILL floating.",
+    bottleFound: "YO JOHN, a message in a bottle:",
+    bottles: [
+      "YO JOHN, (Placeholder memory #1: write a real memory of you two here!)",
+      "YO JOHN, (Placeholder memory #2: something only you two would get.)",
+      "YO JOHN, (Placeholder memory #3: the sweetest one.)",
+    ],
+    rainStops: "YO JOHN... the rain stopped. Look up.",
+    gotCharm: "YO JOHN, the last raindrop. It's a charm for your bracelet.",
+    outro: [
+      "YO JOHN, WE MADE IT TO BUENA VISTA. Mostly dry.",
+      "Wolf Creek Pass opens tomorrow. 2 days till my birthday.",
+    ],
+    completeTitle: "YO JOHN, BUENA VISTA: MOSTLY DRY.",
+    note: "YO JOHN, (Placeholder: write your Day 3 note here!)",
+  },
   wolfCreek: { name: "Wolf Creek Pass" },
   durango: { name: "Durango" },
 
