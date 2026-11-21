@@ -193,4 +193,21 @@ if __name__ == "__main__":
     if lan:
         ip = subprocess.run(["ipconfig", "getifaddr", "en0"], capture_output=True, text=True).stdout.strip()
         print(f"On your phone:  http://{ip}:8765/?preview   and   http://{ip}:8765/record.html")
+        # Phones only allow the microphone over https, so also serve https on 8443 with a
+        # self-signed certificate (the phone shows a warning once; tap through it).
+        certs = os.path.join(ROOT, "tools", "certs")
+        cert, key = os.path.join(certs, "cert.pem"), os.path.join(certs, "key.pem")
+        if not os.path.exists(cert):
+            os.makedirs(certs, exist_ok=True)
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert,
+                            "-days", "365", "-subj", "/CN=drive-home", "-addext", f"subjectAltName=IP:{ip},DNS:localhost"],
+                           capture_output=True)
+        import ssl
+        import threading
+        secure = http.server.ThreadingHTTPServer(("0.0.0.0", 8443), Handler)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(cert, key)
+        secure.socket = ctx.wrap_socket(secure.socket, server_side=True)
+        threading.Thread(target=secure.serve_forever, daemon=True).start()
+        print(f"Record on phone: https://{ip}:8443/record.html  (tap through the warning once)")
     server.serve_forever()

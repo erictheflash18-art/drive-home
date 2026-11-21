@@ -54,6 +54,10 @@
     .edit-actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
     .edit-actions .save { background: var(--teal); }
     .edit-actions small { opacity: .6; }
+    .mic-help { display: none; margin-top: 8px; background: #3a2340; border: 2px solid var(--red); border-radius: 12px; padding: 10px 12px; font-size: 15px; line-height: 1.4; }
+    .mic-help.show { display: block; }
+    .mic-help b { color: var(--gold); }
+    #micBtn.on { background: var(--teal); }
     .matched { font-size: 13px; color: var(--gold); margin-top: 4px; }
     .matched i { opacity: .75; }
     .matched a { color: #fff; font-weight: 800; margin-left: 6px; }
@@ -71,10 +75,12 @@
       <div class="bar">
         <span class="count" id="count"></span>
         <div class="meter"><i id="level"></i></div>
+        <button id="micBtn" class="recbtn">🎙️ Turn on mic</button>
         <label><input type="checkbox" id="onlyMissing"> only show lines I haven't recorded</label>
         <label><input type="checkbox" id="matchWords" checked> change the words to match what I said</label>
       </div>
       <div id="err"></div>
+      <div id="micHelp" class="mic-help"></div>
     </div>
   </header>
   <main class="wrap" id="list"></main>

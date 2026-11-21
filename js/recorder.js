@@ -57,6 +57,7 @@ const Rec = {
       this.showWords(i);
     });
     document.getElementById("onlyMissing").addEventListener("change", () => this.render());
+    document.getElementById("micBtn").addEventListener("click", () => this.micOn().then((ok) => ok && this.startMeter()));
     window.addEventListener("keydown", (e) => {
       if (this.editing !== null) return; // typing in the editor
       if (e.key === " ") { e.preventDefault(); if (!e.repeat) this.toggle(); }
@@ -185,28 +186,9 @@ const Rec = {
     if (!this.lines[this.sel].voiced) return this.error("That one's a sign/label, so it's text only.");
     if (this.recording !== null) return this.stopRec();
     this.error("");
-    if (!navigator.mediaDevices || !window.isSecureContext) {
-      return this.error("Recording only works on the computer (phones need a secure https link for the mic). You can still edit lines and play clips here.");
-    }
     try {
-      if (!this.stream) {
-        this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const an = this.ctx.createAnalyser();
-        an.fftSize = 512;
-        this.ctx.createMediaStreamSource(this.stream).connect(an);
-        const buf = new Uint8Array(an.fftSize);
-        const meter = document.getElementById("level");
-        const tick = () => {
-          an.getByteTimeDomainData(buf);
-          let peak = 0;
-          for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
-          meter.style.width = Math.min(100, (peak / 128) * 160) + "%";
-          meter.style.background = this.recording !== null ? "#e63946" : "#2ec4b6";
-          requestAnimationFrame(tick);
-        };
-        tick();
-      }
+      if (!(await this.micOn())) return;
+      this.startMeter();
       if (this.ctx.state === "suspended") await this.ctx.resume();
       const chunks = [];
       this.recorder = new MediaRecorder(this.stream);
@@ -216,7 +198,59 @@ const Rec = {
       this.recording = this.sel;
       this.render();
     } catch (e) {
-      this.error("Couldn't use the microphone: " + e.message + ". Allow mic access for this page and try again.");
+      this.error("Couldn't start recording: " + e.message);
+    }
+  },
+
+  // Level meter + the audio context used to decode takes (set up once, after the mic is on)
+  startMeter() {
+    if (this.ctx) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = this.ctx.createAnalyser();
+    an.fftSize = 512;
+    this.ctx.createMediaStreamSource(this.stream).connect(an);
+    const buf = new Uint8Array(an.fftSize);
+    const meter = document.getElementById("level");
+    const tick = () => {
+      an.getByteTimeDomainData(buf);
+      let peak = 0;
+      for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
+      meter.style.width = Math.min(100, (peak / 128) * 160) + "%";
+      meter.style.background = this.recording !== null ? "#e63946" : "#2ec4b6";
+      requestAnimationFrame(tick);
+    };
+    tick();
+  },
+
+  // Ask for the microphone. Returns true if we got it; otherwise shows how to fix it.
+  async micOn() {
+    const help = document.getElementById("micHelp");
+    const btn = document.getElementById("micBtn");
+    if (this.stream) return true;
+    const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (!navigator.mediaDevices || !window.isSecureContext) {
+      const httpsUrl = "https://" + location.hostname + ":8443/record.html";
+      help.innerHTML = `Phones only allow the mic on a secure link. Open <b><a style="color:#ffd23f" href="${httpsUrl}">${httpsUrl}</a></b> instead. ` +
+        `Safari will warn that the connection isn't private: tap <b>Show Details</b> → <b>visit this website</b>. That's just your own computer.`;
+      help.classList.add("show");
+      return false;
+    }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      help.classList.remove("show");
+      btn.textContent = "🎙️ Mic on"; btn.classList.add("on");
+      return true;
+    } catch (e) {
+      const blocked = e.name === "NotAllowedError" || e.name === "SecurityError";
+      help.innerHTML = blocked
+        ? (iOS
+          ? `The mic is blocked for this page. In Safari tap <b>aA</b> (left of the address) → <b>Website Settings</b> → <b>Microphone</b> → <b>Allow</b> (or Ask), then reload. ` +
+            `If that's not there: <b>Settings app → Apps → Safari → Microphone → Ask</b>.`
+          : `The mic is blocked for this page. Click the <b>icon left of the address</b> (🔒 or the sliders) → <b>Microphone</b> → <b>Allow</b>, then reload. ` +
+            `On a Mac also check <b>System Settings → Privacy & Security → Microphone</b> and turn your browser on.`)
+        : `Couldn't open a microphone (${e.name}: ${e.message}). Is one plugged in / is another app using it?`;
+      help.classList.add("show");
+      return false;
     }
   },
 

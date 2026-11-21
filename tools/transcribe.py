@@ -87,7 +87,11 @@ def match(audio_path, original, heard=None):
     """Returns the new line text, or None if it already matches (ignoring punctuation and case)."""
     if heard is None:
         heard = transcribe(audio_path, original)
-    if not heard or comparable(heard) == comparable(original):
+    # whisper labels non-speech like [BEEPING], [BLANK_AUDIO], (music): never use those as words
+    heard = " ".join(re.sub(r"\[[^\]]*\]|\([^)]*\)|\*[^*]*\*", " ", heard or "").split())
+    if not re.search(r"[A-Za-z]{2}", heard):
+        return None
+    if comparable(heard) == comparable(original):
         return None
     return style(heard, original)
 
