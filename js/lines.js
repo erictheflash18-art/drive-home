@@ -214,7 +214,7 @@ const LINES = {
       "Welcome to South Park. Buena Vista opens tomorrow.",
     ],
     completeTitle: "YO JOHN, KENOSHA PASS: CONQUERED.",
-    note: "I hope your actual drive home today is a little safer. It takes me when you get there. I love you",
+    note: "I hope your actual drive home today is a little safer. Text me when you get there. I love you",
   },
   // ---------------- LEVEL 3: BUENA VISTA (rafting) ----------------
   buenaVista: {
