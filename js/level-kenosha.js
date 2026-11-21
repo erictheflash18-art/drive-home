@@ -610,14 +610,28 @@ const KenoshaLevel = (() => {
     if (!v.on) return;
     // Always a little faster than you: it creeps up the whole way down, and every mistake
     // (rear-ending a truck, getting hit by a skier) lets it close in a lot.
-    const vSpeed = Math.max(290, (s.air ? s.vx : s.sp) + 20);
+    const yours = s.air ? s.vx : s.sp;
+    let vSpeed = Math.max(290, yours + 20);
+    // The last stretch is always a close call. If the van is far back when you reach it, it
+    // races up and rides your bumper, lunging in and out, but it is never allowed to catch you.
+    // (If it was close enough to catch you on its own, it's left alone.)
+    if (s.x > FINISH - 2600 && v.drama === undefined) v.drama = s.x - v.x > 220;
+    if (v.drama) {
+      const gap = s.x - v.x;
+      const want = 125 + Math.sin(s.t * 2.4) * 32;
+      vSpeed = gap > want ? yours + Math.min(520, (gap - want) * 2.2) : yours - 40;
+      if (!v.closeSaid && gap < 200) { v.closeSaid = true; Sfx.honk(); Engine.toast(L.fratClose, "bad"); }
+    }
     if (s.state === "drive") v.x += vSpeed * dt;
+    if (v.drama) v.x = Math.min(v.x, s.x - 98);
     v.wheel = (v.wheel || 0) + vSpeed * dt / 12;
     if (s.state !== "drive") return;
+    if (v.drama) v.taunt -= dt; // honks twice as often on the final stretch
     v.taunt -= dt;
     if (v.taunt <= 0) { v.taunt = rand(6, 9); Sfx.honk(); Engine.toast(pick(L.fratTaunts)); }
     if (v.x > s.x - 80) {
       v.x = s.x - 850;
+      v.drama = undefined; // knocked back: it gets to come back for the close call
       Sfx.honk(); Sfx.crash(); Engine.shake = 8;
       const lost = Math.min(2, s.flowers);
       s.flowers -= lost;
@@ -716,6 +730,18 @@ const KenoshaLevel = (() => {
     if (SUMMIT > x0 - 200 && SUMMIT < x1 + 200) {
       Art.postSign(ctx, SUMMIT - 120, gy(SUMMIT - 120), L.summitSign, "#6b4f2a");
       Art.postSign(ctx, SUMMIT + 150, gy(SUMMIT + 150), L.trailSign, "#5c4033");
+      // the frat planted their flag at the very top
+      const fx = SUMMIT + 20, fy = by(fx);
+      ctx.fillStyle = "#adb5bd"; ctx.fillRect(fx - 2, fy - 150, 4, 150);
+      ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(fx, fy - 152, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(fx + 2, fy - 146);
+      for (let i = 0; i <= 10; i++) ctx.lineTo(fx + 2 + i * 9, fy - 146 + Math.sin(s.t * 5 - i * 0.6) * 4 * (i / 10));
+      for (let i = 10; i >= 0; i--) ctx.lineTo(fx + 2 + i * 9, fy - 92 + Math.sin(s.t * 5 - i * 0.6) * 4 * (i / 10));
+      ctx.closePath(); ctx.fillStyle = "#7b1e3a"; ctx.fill();
+      ctx.save(); ctx.translate(fx + 47, fy - 119 + Math.sin(s.t * 5 - 3) * 2);
+      ctx.fillStyle = "#f1e3c8"; ctx.font = "800 26px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("ΣΤΓ", 0, 0);
+      ctx.restore();
     }
     for (const c of CHECKPOINTS) {
       if (c < 300 || c < x0 - 40 || c > x1 + 40) continue;

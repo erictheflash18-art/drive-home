@@ -204,6 +204,7 @@ const LINES = {
       "YO JOHN, they're yelling SKI SEASON BRO.",
     ],
     fratCaught: "YO JOHN, THE FRAT GUYS GOT YOU AGAIN. They took 2 flowers.",
+    fratClose: "YO JOHN, THEY'RE RIGHT BEHIND US. GO GO GO.",
     fratLost: "YO JOHN, lost them again.",
     outro: [
       "YO JOHN, WE MADE IT OVER KENOSHA PASS.",
