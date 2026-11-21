@@ -261,10 +261,12 @@ const LINES = {
     bottleMissed: "YO JOHN, you missed a bottle. It came back.",
     keepPaddling: "Keep paddling",
     bottles: [
-      "YO JOHN, (Placeholder memory #1: write a real memory of you two here!)",
-      "YO JOHN, (Placeholder memory #2: something only you two would get.)",
-      "YO JOHN, (Placeholder memory #3: the sweetest one.)",
+      "Reese, last summer was so fun. We went on so many adventures together and spent so many great nights in your van. I can't wait to find more flowers with you!!",
+      "Reese, on top of all of our adventures, thanks for being the chillest mother fucker alive. I love that I can lock my keys in the car, make you surf, and force you to ride over rocks for hours in the smoke, and you are still smiling.",
+      "Thanks for never losing your hesh core steez from when you were a kid. Literally the tuffest person I know. Also you might have the hottest side eye!!!",
     ],
+    // Little signs next to the scenes before each bottle (van bridge, locked keys, kid Reese)
+    refs: ["Van life ♥", "Keys: locked in. Again.", "Hesh core since day one"],
     rainStops: "YO JOHN... the rain stopped. Look up.",
     gotCharm: "YO JOHN, the last raindrop. It's a charm for your bracelet.",
     outro: [

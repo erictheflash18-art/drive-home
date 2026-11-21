@@ -30,7 +30,7 @@ const BuenaVistaLevel = (() => {
   const lazyAmount = (wy) => { const z = inLazy(wy); return z ? Math.min(1, (wy - z[0]) / 300, (z[1] - wy) / 150) : 0; };
   function cx(wy) { return Engine.W / 2 + 55 * Math.sin(wy / 900) + 28 * Math.sin(wy / 377 + 1); }
   function width(wy) {
-    let w = 270 + 30 * Math.sin(wy / 1300) + 40 * lazyAmount(wy);
+    let w = 270 + 30 * Math.sin(wy / 1300) + 10 * lazyAmount(wy);
     const r = inRapid(wy);
     if (r) {
       const edge = Math.min(1, (wy - r[0]) / 300, (r[1] - wy) / 300);
@@ -58,6 +58,7 @@ const BuenaVistaLevel = (() => {
       oarL: 0, oarR: 0, lastSide: null, lastStroke: -9,
       zoom: 1, shrinkT: 0, smallPending: false, nextToe: 10,
       pusher: null, swimT: 0, rain: 1, rainbow: 0, card: null,
+      monster: null, nextMonster: rand(18, 30),
     };
     for (let i = 0; i < 110; i++) s.drops.push({ x: Math.random() * 460, y: Math.random() * Engine.H, l: rand(10, 20), v: rand(520, 760) });
     Confetti.bits = [];
@@ -148,6 +149,7 @@ const BuenaVistaLevel = (() => {
     }
     if (s.state === "swim") { s.swimT -= dt; if (s.swimT <= 0) { s.state = "drive"; s.invuln = 1.5; } }
     if (s.state === "drive") events(dt);
+    updateMonster(dt);
     updatePusher(dt);
     updateBottles(dt);
     touchObjects();
@@ -429,6 +431,8 @@ const BuenaVistaLevel = (() => {
         ctx.beginPath(); ctx.moveTo(x - 10, y); ctx.quadraticCurveTo(x, y - 5, x + 10, y); ctx.stroke();
       }
     }
+    drawMonster(ctx);
+
     // trees + bank rocks
     for (let i = Math.floor((s.dist - (bot - py)) / 70); i <= (s.dist + (py - top)) / 70; i++) {
       const wy = i * 70, y = sy(wy);
@@ -445,6 +449,9 @@ const BuenaVistaLevel = (() => {
       const [l, r] = banks(FINISH);
       for (let x = l; x < r; x += 16) { ctx.fillStyle = (Math.floor(x / 16) % 2) ? "#fff" : "#e63946"; ctx.fillRect(x, fy - 4, 16, 8); }
     }
+
+    // the memories' scenes on the banks (before each bottle)
+    drawScenes(ctx, top, bot);
 
     // objects
     for (const o of s.objs) {
@@ -475,6 +482,7 @@ const BuenaVistaLevel = (() => {
     const swimming = s.state === "swim";
     raft(ctx, s.x, py, s.ang, "#ffbe0b", !swimming, s.t);
     if (swimming) swimmer(ctx, s.x + 44, py + 10);
+    drawBridge(ctx, top, bot); // over the raft: you float under it
     ctx.restore();
 
     // screen-space effects
@@ -487,6 +495,17 @@ const BuenaVistaLevel = (() => {
     if (s.gp !== undefined && s.gp < 1) { // the RV grandparents drift overhead
       s.gp += 1 / 60 / 6;
       for (let i = 0; i < 2; i++) chute(ctx, W * (1.1 - s.gp * 1.3) + i * 70, 140 + i * 40, i ? "#f15bb5" : "#3a86ff");
+    }
+    // wildfire smoke hanging over the second memory's stretch
+    const smoke = Math.max(0, Math.min(1, (s.dist - (BOTTLES[1] - 1300)) / 400, (BOTTLES[1] + 200 - s.dist) / 300));
+    if (smoke > 0) {
+      ctx.fillStyle = `rgba(176,150,120,${0.32 * smoke})`; ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < 6; i++) {
+        const x = ((s.t * (12 + i * 3) + i * 97) % (W + 200)) - 100, y = 120 + i * 120 + Math.sin(s.t * 0.4 + i) * 30;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 140);
+        g.addColorStop(0, `rgba(160,140,115,${0.25 * smoke})`); g.addColorStop(1, "rgba(160,140,115,0)");
+        ctx.fillStyle = g; ctx.fillRect(x - 140, y - 140, 280, 280);
+      }
     }
     if (s.rain > 0) {
       ctx.strokeStyle = `rgba(210,230,255,${0.5 * s.rain})`; ctx.lineWidth = 1.4;
@@ -595,6 +614,149 @@ const BuenaVistaLevel = (() => {
     ctx.fillStyle = "#ffd7b5"; ctx.beginPath(); ctx.arc(0, -10, 6, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "#ffd7b5"; ctx.lineWidth = 3; ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(-8, -4); ctx.lineTo(-18, -10); ctx.moveTo(8, -4); ctx.lineTo(18, 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- Scenes before each bottle ----------
+  function drawScenes(ctx, top, bot) {
+    const [b1, b2, b3] = BOTTLES;
+    // 1. van summer: wildflowers on both banks (the bridge itself is drawn over the raft)
+    for (let wy = b1 - 1300; wy < b1 + 150; wy += 46) {
+      const y = sy(wy);
+      if (y < top - 20 || y > bot + 20) continue;
+      const [l, r] = banks(wy);
+      for (const side of [-1, 1]) {
+        const x = side < 0 ? l - 10 - hash(wy, side + 5) * 26 : r + 10 + hash(wy, side + 6) * 26;
+        wildflower(ctx, x, y + hash(wy, 7 + side) * 20, hash(wy, 9 + side) < 0.55);
+      }
+    }
+    // 2. keys locked in the car (left bank) + mountain biker on the rocks (right bank)
+    let y = sy(b2 - 900);
+    if (y > top - 80 && y < bot + 80) {
+      const [l] = banks(b2 - 900);
+      const cx0 = Math.max(34, l - 14);
+      ctx.save(); ctx.translate(cx0, y); ctx.scale(1.35, 1.35);
+      Art.car(ctx, 0, 0, "#457b9d");
+      ctx.font = "18px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🔑", 0, -2);
+      ctx.font = "15px sans-serif"; ctx.fillText("🔒", 14, 24);
+      ctx.restore();
+      bankSign(ctx, b2 - 760, L.refs[1], -1);
+    }
+    y = sy(b2 - 480);
+    if (y > top - 60 && y < bot + 60) {
+      const [, r] = banks(b2 - 480);
+      const x = Math.min(Engine.W - 24, r + 22);
+      for (let i = 0; i < 5; i++) rock(ctx, x - 18 + i * 9, y + 10 + (i % 2) * 8, 9, 400 + i);
+      ctx.font = "44px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🚵‍♀️", x - 6, y - 14);
+    }
+    // 3. little hesh-core Reese on the left bank, and a boulder giving the side-eye on the right
+    y = sy(b3 - 820);
+    if (y > top - 80 && y < bot + 80) {
+      const [l] = banks(b3 - 820);
+      ctx.save(); ctx.translate(Math.max(34, l - 14), y); ctx.scale(1.8, 1.8); kidReese(ctx, 0, 0); ctx.restore();
+      bankSign(ctx, b3 - 690, L.refs[2], -1);
+    }
+    y = sy(b3 - 430);
+    if (y > top - 60 && y < bot + 60) {
+      const [, r] = banks(b3 - 430);
+      const ex = Math.min(Engine.W - 40, r + 22);
+      ctx.save(); ctx.translate(ex, y); ctx.scale(1.4, 1.4); ctx.translate(-ex, -y); sideEyeRock(ctx, ex, y); ctx.restore();
+    }
+  }
+
+  function drawBridge(ctx, top, bot) {
+    const wy = BOTTLES[0] - 650, y = sy(wy);
+    if (y < top - 60 || y > bot + 60) return;
+    const W = Engine.W;
+    ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.fillRect(-40, y - 16, W + 80, 44);       // shadow on the water
+    ctx.fillStyle = "#8d6e53"; ctx.fillRect(-40, y - 24, W + 80, 40);                // deck
+    ctx.strokeStyle = "#6f5440"; ctx.lineWidth = 2;
+    for (let x = -40; x < W + 40; x += 14) { ctx.beginPath(); ctx.moveTo(x, y - 24); ctx.lineTo(x, y + 16); ctx.stroke(); }
+    ctx.fillStyle = "#5c4033"; ctx.fillRect(-40, y - 27, W + 80, 5); ctx.fillRect(-40, y + 14, W + 80, 5); // rails
+    // the Euro van rolls across, back and forth
+    const span = W - 20, p = (s.t * 70) % (span * 2);                                 // back and forth, always on the bridge
+    const dir = p < span ? 1 : -1, vx = (p < span ? p : span * 2 - p) + 10;
+    ctx.save(); ctx.translate(vx, y - 4); if (dir < 0) ctx.scale(-1, 1);
+    ctx.fillStyle = "rgba(0,0,0,.25)"; Art.rr(ctx, -30, -12, 64, 30, 8); ctx.fill();
+    ctx.fillStyle = "#f1ede4"; Art.rr(ctx, -33, -15, 66, 30, 8); ctx.fill();           // body
+    ctx.fillStyle = "#2a9d8f"; Art.rr(ctx, 14, -15, 19, 30, 6); ctx.fill();            // front
+    ctx.fillStyle = "#e76f51"; Art.rr(ctx, -26, -10, 34, 20, 5); ctx.fill();           // pop-top tent
+    ctx.fillStyle = "#bde8ff"; ctx.fillRect(22, -11, 6, 22);                          // windshield
+    ctx.restore();
+    bankSign(ctx, wy + 70, L.refs[0], 1);
+  }
+
+  function wildflower(ctx, x, y, purple) {
+    ctx.fillStyle = "#3a7d44"; ctx.fillRect(x - 0.75, y, 1.5, 8);
+    ctx.fillStyle = purple ? "#9d8df1" : "#fbf8ef";
+    for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 3.4, y + Math.sin(a) * 3.4, 2.8, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = purple ? "#ffb703" : "#f4a261"; ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Kid Reese, like the photo: lime-green cap, white shades, white sweater vest, race lanyard
+  function kidReese(ctx, x, y) {
+    ctx.save(); ctx.translate(x, y + Math.sin(s.t * 3) * 1.5);
+    ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(0, 26, 14, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#7b68ee"; Art.rr(ctx, -11, -2, 22, 20, 5); ctx.fill();          // purple tee
+    ctx.fillStyle = "#f8f4ea"; Art.rr(ctx, -8, -2, 16, 22, 4); ctx.fill();           // white vest
+    ctx.strokeStyle = "#3a6ea5"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-4, -2); ctx.lineTo(0, 9); ctx.lineTo(4, -2); ctx.stroke(); // lanyard
+    ctx.fillStyle = "#f4f1e8"; ctx.fillRect(-2, 9, 5, 6);
+    ctx.fillStyle = "#ffd7b5"; ctx.fillRect(-7, 20, 4, 7); ctx.fillRect(3, 20, 4, 7); // legs
+    ctx.beginPath(); ctx.arc(0, -10, 8, 0, Math.PI * 2); ctx.fill();                 // face
+    ctx.fillStyle = "#f2d16b"; ctx.fillRect(-9, -11, 3, 7); ctx.fillRect(6, -11, 3, 7); // blonde hair
+    ctx.fillStyle = "#9ef01a"; ctx.beginPath(); ctx.arc(0, -13, 8.5, Math.PI, 0); ctx.fill(); ctx.fillRect(-2, -15, 13, 3); // lime cap
+    ctx.fillStyle = "#f8f9fa"; Art.rr(ctx, -7, -11, 14, 4, 2); ctx.fill();          // white shades
+    ctx.fillStyle = "#1b1f2e"; ctx.fillRect(-6, -10, 5, 2); ctx.fillRect(1, -10, 5, 2);
+    ctx.strokeStyle = "#1b1f2e"; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(0, -6, 3, 0.2, Math.PI - 0.2); ctx.stroke(); // grin
+    ctx.restore();
+  }
+
+  // A boulder doing a full side-eye at the raft as it drifts by
+  function sideEyeRock(ctx, x, y) {
+    ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(x + 4, y + 6, 28, 20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#a89f91"; ctx.beginPath(); ctx.ellipse(x, y, 28, 22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#3d3a35"; ctx.lineWidth = 3; ctx.stroke();
+    const dx = clamp((s.x - x) / 60, -1, 1), dy = clamp((P() - y) / 200, -1, 1);
+    for (const ex of [-10, 10]) {
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(x + ex, y - 3, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.arc(x + ex + dx * 4, y - 2 + dy * 1.5, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#a89f91"; ctx.fillRect(x + ex - 8, y - 10, 16, 5);              // heavy lids = side eye
+      ctx.strokeStyle = "#3d3a35"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + ex - 8, y - 5); ctx.lineTo(x + ex + 8, y - 6); ctx.stroke();
+    }
+  }
+
+  // ---------- The monster: just passing through ----------
+  function updateMonster(dt) {
+    if (s.state === "intro") return;
+    const m = s.monster;
+    if (!m) {
+      s.nextMonster -= dt;
+      if (s.nextMonster <= 0) {
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        s.monster = { wy: s.dist + rand(120, 380), x: dir > 0 ? -160 : Engine.W + 160, dir, t: 0 };
+      }
+      return;
+    }
+    m.t += dt;
+    m.x += m.dir * 52 * dt;
+    if ((m.dir > 0 && m.x > Engine.W + 200) || (m.dir < 0 && m.x < -200) || sy(m.wy) > Engine.H + 200) {
+      s.monster = null; s.nextMonster = rand(25, 45);
+    }
+  }
+
+  function drawMonster(ctx) {
+    const m = s.monster;
+    if (!m) return;
+    const y = sy(m.wy);
+    const fade = Math.min(1, m.t / 1.5);
+    ctx.save(); ctx.globalAlpha = 0.17 * fade; ctx.fillStyle = "#06121f";
+    ctx.translate(m.x, y); ctx.scale(m.dir, 1);
+    for (let i = 0; i < 7; i++) { // long body, wiggling
+      const bx = -i * 30, by = Math.sin(s.t * 2 - i * 0.7) * 10;
+      ctx.beginPath(); ctx.ellipse(bx, by, 26 - i * 2.2, 16 - i * 1.6, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.ellipse(28, Math.sin(s.t * 2 + 0.7) * 10, 22, 14, 0, 0, Math.PI * 2); ctx.fill(); // head
+    for (const fy of [-1, 1]) { ctx.beginPath(); ctx.ellipse(-20, fy * 22 + Math.sin(s.t * 2) * 6, 16, 6, fy * 0.6, 0, Math.PI * 2); ctx.fill(); } // fins
     ctx.restore();
   }
 
