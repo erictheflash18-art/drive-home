@@ -6,13 +6,13 @@
 const BuenaVistaLevel = (() => {
   const L = LINES.buenaVista;
   const FINISH = 18800;
-  const CURRENT = 165, RAPID_CURRENT = 245, LAZY_CURRENT = 110;
+  const CURRENT = 165, RAPID_CURRENT = 245, LAZY_CURRENT = 62;
   const RAPIDS = [[2500, 3600, 0], [7000, 8400, 1], [12000, 13600, 2]]; // [start, end, sign index]
   const HARD_RAPID = 2;              // Raft Ripper: narrow and rocky
   const PUSHERS = [3900, 8800, 14000];
   const BOTTLES = [6400, 11400, 16400];
   // A slow, wide, empty lazy-river stretch before each bottle: a natural pause for the memory
-  const LAZY = BOTTLES.map((b) => [b - 1250, b + 150]);
+  const LAZY = BOTTLES.map((b) => [b - 1400, b + 150]);
   const GRANDPARENTS = 9800;
   const RAIN_STOPS = 16700;
   const CHARM = 17500;
@@ -131,8 +131,11 @@ const BuenaVistaLevel = (() => {
       const wy = s.dist;
       const cur = current(wy);
       s.boost = Math.max(-80, s.boost - s.boost * 1.4 * dt);
-      if (s.beerT > 0) { s.beerT -= dt; s.boost = Math.max(s.boost, 110); if (s.beerT <= 0) Engine.toast(pick(LINES.doesntLastLong)); }
+      if (s.beerT > 0) { s.beerT -= dt; s.boost = Math.max(s.boost, 110 * (1 - lazyAmount(s.dist))); if (s.beerT <= 0) Engine.toast(pick(LINES.doesntLastLong)); }
       s.buzz = Math.max(0, s.buzz - dt * 0.16);
+      // in the calm stretches paddling only nudges you along, so the scenes don't fly by
+      const lz = lazyAmount(s.dist);
+      if (lz > 0) s.boost = Math.min(s.boost, 170 * (1 - lz) + 16 * lz);
       const v = s.state === "done" ? cur * 0.4 : cur + s.boost;
       s.dist += v * dt;
       // the river carries you around its bends
@@ -621,44 +624,46 @@ const BuenaVistaLevel = (() => {
   function drawScenes(ctx, top, bot) {
     const [b1, b2, b3] = BOTTLES;
     // 1. van summer: wildflowers on both banks (the bridge itself is drawn over the raft)
-    for (let wy = b1 - 1300; wy < b1 + 150; wy += 46) {
+    for (let wy = b1 - 1300; wy < b1 + 150; wy += 64) {
       const y = sy(wy);
       if (y < top - 20 || y > bot + 20) continue;
       const [l, r] = banks(wy);
       for (const side of [-1, 1]) {
         const x = side < 0 ? l - 10 - hash(wy, side + 5) * 26 : r + 10 + hash(wy, side + 6) * 26;
-        wildflower(ctx, x, y + hash(wy, 7 + side) * 20, hash(wy, 9 + side) < 0.55);
+        ctx.save(); ctx.translate(x, y + hash(wy, 7 + side) * 20); ctx.scale(2.3, 2.3);
+        wildflower(ctx, 0, 0, hash(wy, 9 + side) < 0.55);
+        ctx.restore();
       }
     }
     // 2. keys locked in the car (left bank) + mountain biker on the rocks (right bank)
-    let y = sy(b2 - 900);
+    let y = sy(b2 - 640);
     if (y > top - 80 && y < bot + 80) {
-      const [l] = banks(b2 - 900);
+      const [l] = banks(b2 - 640);
       const cx0 = Math.max(34, l - 14);
       ctx.save(); ctx.translate(cx0, y); ctx.scale(1.35, 1.35);
       Art.car(ctx, 0, 0, "#457b9d");
       ctx.font = "18px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🔑", 0, -2);
       ctx.font = "15px sans-serif"; ctx.fillText("🔒", 14, 24);
       ctx.restore();
-      bankSign(ctx, b2 - 760, L.refs[1], -1);
+      bankSign(ctx, b2 - 500, L.refs[1], -1);
     }
-    y = sy(b2 - 480);
+    y = sy(b2 - 360);
     if (y > top - 60 && y < bot + 60) {
-      const [, r] = banks(b2 - 480);
+      const [, r] = banks(b2 - 360);
       const x = Math.min(Engine.W - 24, r + 22);
       for (let i = 0; i < 5; i++) rock(ctx, x - 18 + i * 9, y + 10 + (i % 2) * 8, 9, 400 + i);
       ctx.font = "44px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🚵‍♀️", x - 6, y - 14);
     }
     // 3. little hesh-core Reese on the left bank, and a boulder giving the side-eye on the right
-    y = sy(b3 - 820);
+    y = sy(b3 - 640);
     if (y > top - 80 && y < bot + 80) {
-      const [l] = banks(b3 - 820);
+      const [l] = banks(b3 - 640);
       ctx.save(); ctx.translate(Math.max(34, l - 14), y); ctx.scale(1.8, 1.8); kidReese(ctx, 0, 0); ctx.restore();
-      bankSign(ctx, b3 - 690, L.refs[2], -1);
+      bankSign(ctx, b3 - 500, L.refs[2], -1);
     }
-    y = sy(b3 - 430);
+    y = sy(b3 - 340);
     if (y > top - 60 && y < bot + 60) {
-      const [, r] = banks(b3 - 430);
+      const [, r] = banks(b3 - 340);
       const ex = Math.min(Engine.W - 40, r + 22);
       ctx.save(); ctx.translate(ex, y); ctx.scale(1.4, 1.4); ctx.translate(-ex, -y); sideEyeRock(ctx, ex, y); ctx.restore();
     }
