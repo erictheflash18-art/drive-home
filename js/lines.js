@@ -244,6 +244,16 @@ const LINES = {
       "Chad: You love rafting! Rafting is basically swimming!",
     ],
     pushedIn: "Chad pushed you in.",
+    surferHit: [
+      "YO JOHN, you ran over a river surfer.",
+      "Surfer: BRAH.",
+      "YO JOHN, he was shredding. Was.",
+    ],
+    beerGrab: [
+      "YO JOHN, liquid courage.",
+      "YO JOHN, Chad left these. Classic Chad.",
+      "YO JOHN, the river is spinning. Or is that you?",
+    ],
     pusherWindup: "YO JOHN, CHAD IS WINDING UP. MOVE.",
     pusherGiveUp: "Chad: ...fine. Next time.",
     grandparents: "YO JOHN, the RV grandparents are STILL floating.",

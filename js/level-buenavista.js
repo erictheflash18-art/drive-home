@@ -15,6 +15,7 @@ const BuenaVistaLevel = (() => {
   const RAIN_STOPS = 14800;
   const CHARM = 15700;
   const RAFT_R = 30;
+  const BEERS = [1500, 4400, 5500, 8000, 9500, 13800]; // calm water only
 
   let s;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -45,6 +46,7 @@ const BuenaVistaLevel = (() => {
     s = {
       dist: 0, x: cx(0), vx: 0, boost: 0, spin: 0, ang: 0, t: 0,
       state: "intro", flowers: 0, toes: 0, dunks: 0, rocksHit: 0, bottles: 0, charm: false,
+      beers: 0, beerT: 0, buzz: 0, surfersHit: 0,
       objs: [], floaters: [], drops: [], flags: {}, invuln: 0,
       oarL: 0, oarR: 0, lastSide: null, lastStroke: -9,
       zoom: 1, shrinkT: 0, smallPending: false, nextToe: 10,
@@ -81,6 +83,9 @@ const BuenaVistaLevel = (() => {
       for (let i = 0; i < 3; i++) add({ type: "flower", wy: wy + i * 50, x: x + Math.sin(i) * 10, hue: (Math.floor(wy / 10) + i) % 3 });
     }
     BOTTLES.forEach((wy, i) => add({ type: "bottle", wy, x: cx(wy) + (i % 2 ? 40 : -40), n: i }));
+    BEERS.forEach((wy, i) => add({ type: "beer", wy, x: cx(wy) + [-50, 45, 0, 60, -40, 30][i] }));
+    // a river surfer on the standing wave at the bottom of each rapid
+    RAPIDS.forEach(([, end], i) => add({ type: "surfer", wy: end - 110, x: cx(end - 110), phase: i * 2, down: 0 }));
     add({ type: "charm", wy: CHARM, x: cx(CHARM) });
     // keep the path clear right around the bottles and the charm
     s.objs = s.objs.filter((o) => o.type !== "rock" || ![...BOTTLES, CHARM].some((b) => Math.abs(o.wy - b) < 160));
@@ -117,6 +122,8 @@ const BuenaVistaLevel = (() => {
       const wy = s.dist;
       const cur = current(wy);
       s.boost = Math.max(-80, s.boost - s.boost * 1.4 * dt);
+      if (s.beerT > 0) { s.beerT -= dt; s.boost = Math.max(s.boost, 110); if (s.beerT <= 0) Engine.toast(pick(LINES.doesntLastLong)); }
+      s.buzz = Math.max(0, s.buzz - dt * 0.16);
       const v = s.state === "done" ? cur * 0.4 : cur + s.boost;
       s.dist += v * dt;
       // the river carries you around its bends
@@ -244,6 +251,14 @@ const BuenaVistaLevel = (() => {
         if (d < o.r + RAFT_R - 6 && s.state === "drive") hitRock(o);
         continue;
       }
+      if (o.type === "surfer") {
+        const [bl, br] = banks(o.wy);
+        o.down = Math.max(0, o.down - 1 / 60);
+        o.x = (bl + br) / 2 + ((br - bl) / 2 - 36) * Math.sin(s.t * 1.25 + o.phase);
+        if (!o.down && s.state === "drive" && Math.abs(y - py) < 38 && Math.abs(o.x - s.x) < 40) hitSurfer(o);
+        continue;
+      }
+      if (o.type === "beer" && d < RAFT_R + 24 && s.state === "drive") { o.got = true; drinkBeer(); continue; }
       if (d > RAFT_R + 22) continue;
       if (o.type === "flower") { o.got = true; s.flowers++; Sfx.flower(); }
       else if (o.type === "bottle") {
@@ -304,6 +319,27 @@ const BuenaVistaLevel = (() => {
     for (const o of s.objs) if (o.type === "rock" && !o.got && s.objs.some((b) => b.type === "bottle" && !b.got && Math.abs(b.wy - o.wy) < 60 && Math.abs(b.x - o.x) < o.r + 30)) o.got = true;
   }
 
+  function hitSurfer(o) {
+    o.down = 2.2;
+    const away = Math.sign(s.x - o.x) || 1;
+    s.vx = away * 190; s.spin += away * 2.4; s.boost = Math.min(s.boost, -60);
+    if (s.invuln > 0) return;
+    s.invuln = 1;
+    s.surfersHit++;
+    Sfx.crash(); Sfx.splash(); Engine.shake = 6;
+    if (s.flowers > 0) { s.flowers--; s.floaters.push({ x: s.x, y: P() - 60, text: "-1 🌼", t: 0 }); }
+    Engine.toast(pick(L.surferHit), "bad");
+  }
+
+  // Beer: a speed boost... and the screen gets a little wobbly. Every can makes it worse.
+  function drinkBeer() {
+    s.beers++;
+    s.beerT = 4;
+    s.buzz = Math.min(1, s.buzz + 0.55);
+    Sfx.tone(500, 0.08, "square", 0.06); Sfx.tone(380, 0.25, "sawtooth", 0.05, 0.08, 120); // crack... glug
+    Engine.toast(L.beerGrab[(s.beers - 1) % L.beerGrab.length], "good");
+  }
+
   function hitRock(o) {
     const away = Math.sign(s.x - o.x) || 1;
     s.vx = away * 170; s.spin += away * 2.2; s.boost = Math.min(s.boost, -50);
@@ -334,6 +370,8 @@ const BuenaVistaLevel = (() => {
         { icon: "🌊", value: s.dunks, label: "times pushed in" },
         { icon: "🪨", value: s.rocksHit, label: "rocks hit" },
         { icon: "🍾", value: s.bottles + "/" + BOTTLES.length, label: "bottles found" },
+        { icon: "🏄", value: s.surfersHit, label: "surfers hit" },
+        { icon: "🍺", value: s.beers, label: "beers" },
       ],
       note: L.note,
     });
@@ -344,8 +382,10 @@ const BuenaVistaLevel = (() => {
     const W = Engine.W, H = Engine.H, py = P();
     ctx.save();
     if (Engine.shake) ctx.translate(rand(-1, 1) * Engine.shake, rand(-1, 1) * Engine.shake);
-    const k = s.zoom;
-    ctx.translate(s.x, py); ctx.scale(k, k); ctx.translate(-s.x, -py);
+    const k = s.zoom * (1 + s.buzz * 0.06 * Math.sin(s.t * 2.1));
+    ctx.translate(s.x, py); ctx.scale(k, k);
+    if (s.buzz > 0) ctx.rotate(Math.sin(s.t * 1.6) * 0.09 * s.buzz);
+    ctx.translate(-s.x, -py);
     const top = py - py / k - 40, bot = py + (H - py) / k + 40;
     const left = s.x - W / k, right = s.x + W / k;
 
@@ -406,6 +446,8 @@ const BuenaVistaLevel = (() => {
       if (o.type === "rock") rock(ctx, o.x, y, o.r, o.wy);
       else if (o.type === "flower") Art.flower(ctx, o.x + Math.sin(s.t * 2 + o.wy) * 3, y, s.t, o.hue);
       else if (o.type === "bottle") bottle(ctx, o.x + Math.sin(s.t * 2 + o.n) * 4, y);
+      else if (o.type === "beer") beerCan(ctx, o.x + Math.sin(s.t * 2 + o.wy) * 3, y);
+      else if (o.type === "surfer") surfer(ctx, o, y);
       else if (o.type === "charm") raindrop(ctx, o.x, y + Math.sin(s.t * 3) * 4);
     }
 
@@ -460,6 +502,20 @@ const BuenaVistaLevel = (() => {
     }
     Confetti.draw(ctx);
     ctx.restore();
+    if (s.buzz > 0.02) { // double vision: a faint shifted copy of the whole frame
+      const cv = ctx.canvas;
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 0.32 * s.buzz;
+      ctx.drawImage(cv, Math.sin(s.t * 1.3) * 26 * s.buzz * Engine.dpr, Math.cos(s.t * 0.9) * 8 * s.buzz * Engine.dpr);
+      ctx.restore();
+    }
+    cv_blur(s.buzz);
+  }
+
+  function cv_blur(b) {
+    const c = $("canvas");
+    const f = b > 0.02 ? `blur(${(b * 1.6).toFixed(2)}px) saturate(${1 + b * 0.5})` : "";
+    if (c.style.filter !== f) c.style.filter = f;
   }
 
   function raft(ctx, x, y, ang, color, penguin, t) {
@@ -493,6 +549,44 @@ const BuenaVistaLevel = (() => {
       ctx.fillStyle = "#7b1e3a"; ctx.beginPath(); ctx.arc(0, 6, 10, 0, Math.PI); ctx.fill(); ctx.fillRect(-6, 13, 12, 6);
       ctx.fillStyle = "#f1e3c8"; ctx.font = "800 7px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("ΣΤΓ", 0, 10);
     }
+    ctx.restore();
+  }
+
+  function beerCan(ctx, x, y) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(s.t * 1.7 + x) * 0.6 + 0.9);
+    ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.beginPath(); ctx.ellipse(0, 0, 22, 14, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#cfd8e3"; Art.rr(ctx, -16, -8, 32, 16, 5); ctx.fill();
+    ctx.fillStyle = "#3a6ea5"; ctx.fillRect(-10, -8, 20, 16);
+    ctx.fillStyle = "#fff"; ctx.font = "800 7px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("BEER", 0, 0.5);
+    ctx.fillStyle = "#9aa7b5"; ctx.fillRect(14, -6, 3, 12);
+    ctx.restore();
+  }
+
+  // Standing wave across the river with a surfer carving back and forth on it
+  function surfer(ctx, o, y) {
+    const [l, r] = banks(o.wy);
+    ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 7;
+    ctx.beginPath();
+    for (let x = l + 4; x <= r - 4; x += 8) ctx.lineTo(x, y + 14 + Math.sin(x / 18 + s.t * 6) * 3);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let x = l + 4; x <= r - 4; x += 8) ctx.lineTo(x, y + 26 + Math.sin(x / 14 - s.t * 5) * 3);
+    ctx.stroke();
+    if (o.down > 0) { // wiped out
+      ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(o.x, y, 14 + (2.2 - o.down) * 10, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#ffd7b5"; ctx.beginPath(); ctx.arc(o.x, y, 6, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+    const lean = Math.cos(s.t * 1.25 + o.phase) * 0.5;
+    ctx.save(); ctx.translate(o.x, y); ctx.rotate(lean);
+    ctx.fillStyle = "#ff006e"; ctx.beginPath(); ctx.ellipse(0, 0, 9, 30, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.fillRect(-1.5, -26, 3, 52);
+    ctx.fillStyle = "#06d6a0"; Art.rr(ctx, -9, -8, 18, 14, 5); ctx.fill();   // shirt
+    ctx.fillStyle = "#ffd7b5"; ctx.beginPath(); ctx.arc(0, -10, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#ffd7b5"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-8, -4); ctx.lineTo(-18, -10); ctx.moveTo(8, -4); ctx.lineTo(18, 2); ctx.stroke();
     ctx.restore();
   }
 
@@ -607,6 +701,6 @@ const BuenaVistaLevel = (() => {
     update, draw,
     _debug: () => s, // used by the test script
     _banks: (wy) => banks(wy),
-    stop() { if (s.closeMemory) s.closeMemory(); ToePrompt.cancel(); Sfx.rainStop(0.3); s.state = "done"; s.dead = true; Engine.closeDialog(); Engine.hideBanner(); Confetti.bits = []; },
+    stop() { cv_blur(0); if (s.closeMemory) s.closeMemory(); ToePrompt.cancel(); Sfx.rainStop(0.3); s.state = "done"; s.dead = true; Engine.closeDialog(); Engine.hideBanner(); Confetti.bits = []; },
   };
 })();
