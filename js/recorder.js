@@ -10,9 +10,13 @@ const SECTION_NAMES = {
   durango: "Level 5: Durango",
 };
 
+// Lines that can have a photo attached (the memories in the bottles)
+const PHOTO_LINE = /\.bottles\.\d+$/;
+
 const Rec = {
   lines: Voice.allLines(true),
   clips: typeof VOICE_CLIPS !== "undefined" ? { ...VOICE_CLIPS } : {},
+  photos: typeof PHOTOS !== "undefined" ? { ...PHOTOS } : {},
   recordedText: {}, // key → the words that take was recorded with
   sel: 0,
   stream: null,
@@ -55,6 +59,7 @@ const Rec = {
       l.row = row;
       list.appendChild(row);
       this.showWords(i);
+      if (PHOTO_LINE.test(l.key)) this.addPhotoControls(i);
     });
     document.getElementById("onlyMissing").addEventListener("change", () => this.render());
     document.getElementById("micBtn").addEventListener("click", () => this.micOn().then((ok) => ok && this.startMeter()));
@@ -311,6 +316,48 @@ const Rec = {
       this.render();
     });
     l.row.querySelector(".words").appendChild(note);
+  },
+
+  // 📷 Photos for memory lines: pick one (camera roll on a phone), it's resized and saved to photos/
+  addPhotoControls(i) {
+    const l = this.lines[i];
+    const box = document.createElement("div");
+    box.className = "photo-row";
+    box.innerHTML = `<img hidden alt=""><button class="pick">📷 Add photo</button><button class="rm" hidden>Remove</button>
+      <input type="file" accept="image/*" hidden>`;
+    const input = box.querySelector("input"), img = box.querySelector("img");
+    const pick = box.querySelector(".pick"), rm = box.querySelector(".rm");
+    const show = () => {
+      const url = this.photos[l.key];
+      img.hidden = !url; rm.hidden = !url;
+      if (url) img.src = url;
+      pick.textContent = url ? "📷 Change photo" : "📷 Add photo";
+    };
+    pick.addEventListener("click", (e) => { e.stopPropagation(); input.click(); });
+    box.addEventListener("click", (e) => e.stopPropagation());
+    input.addEventListener("change", async () => {
+      const f = input.files[0];
+      if (!f) return;
+      pick.textContent = "uploading…";
+      try {
+        const r = await fetch("/api/photo?key=" + encodeURIComponent(l.key), { method: "POST", body: f });
+        const res = await r.json();
+        if (!r.ok) throw new Error(res.error || "Upload failed.");
+        this.photos = res.photos;
+        this.error("");
+      } catch (e) { this.error(e.message); }
+      input.value = "";
+      show();
+    });
+    rm.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm("Remove this photo?")) return;
+      const r = await fetch("/api/photo-delete?key=" + encodeURIComponent(l.key), { method: "POST" });
+      this.photos = (await r.json()).photos;
+      show();
+    });
+    l.row.querySelector(".text").appendChild(box);
+    show();
   },
 
   play(i) {

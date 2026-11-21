@@ -247,13 +247,38 @@ const BuenaVistaLevel = (() => {
       if (o.type === "flower") { o.got = true; s.flowers++; Sfx.flower(); }
       else if (o.type === "bottle") {
         o.got = true; s.bottles++; Sfx.fanfare();
-        s.card = { text: L.bottles[o.n] || "", t: 6 };
-        Voice.play(L.bottles[o.n], "interrupt");
+        showMemory(o.n);
       } else if (o.type === "charm" && s.state === "drive") {
         o.got = true; s.charm = true; Sfx.fanfare(); Confetti.burst(80, Engine.W);
         Engine.toast(L.gotCharm, "good");
       }
     }
+  }
+
+  // The memory card: photo (if one's attached) + your words. The river waits until she taps.
+  function showMemory(n) {
+    const key = "buenaVista.bottles." + n;
+    const photo = typeof PHOTOS !== "undefined" && PHOTOS[key];
+    $("memoryLabel").textContent = "🍾 " + L.bottleFound;
+    $("memoryText").textContent = L.bottles[n] || "";
+    const img = $("memoryImg");
+    img.hidden = !photo;
+    if (photo) img.src = photo;
+    $("memoryBtn").textContent = L.keepPaddling + " 🚣";
+    $("memory").classList.add("show");
+    Engine.paused = true;
+    ToePrompt.cancel();
+    Voice.play(L.bottles[n], "interrupt");
+    const close = (e) => {
+      if (e) e.preventDefault();
+      $("memory").classList.remove("show");
+      Engine.paused = false;
+      Engine.presses.left = Engine.presses.right = 0;
+      $("memoryBtn").removeEventListener("click", close);
+      s.closeMemory = null;
+    };
+    $("memoryBtn").addEventListener("click", close);
+    s.closeMemory = close;
   }
 
   function hitRock(o) {
@@ -410,7 +435,6 @@ const BuenaVistaLevel = (() => {
       ctx.fillStyle = "#e63946"; ctx.fillText(f.text, f.x, f.y);
       ctx.globalAlpha = 1;
     }
-    if (s.card) bottleCard(ctx, s.card);
     Confetti.draw(ctx);
     ctx.restore();
   }
@@ -560,6 +584,6 @@ const BuenaVistaLevel = (() => {
     update, draw,
     _debug: () => s, // used by the test script
     _banks: (wy) => banks(wy),
-    stop() { ToePrompt.cancel(); Sfx.rainStop(0.3); s.state = "done"; s.dead = true; Engine.closeDialog(); Engine.hideBanner(); Confetti.bits = []; },
+    stop() { if (s.closeMemory) s.closeMemory(); ToePrompt.cancel(); Sfx.rainStop(0.3); s.state = "done"; s.dead = true; Engine.closeDialog(); Engine.hideBanner(); Confetti.bits = []; },
   };
 })();

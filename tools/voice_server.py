@@ -23,6 +23,19 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AUDIO = os.path.join(ROOT, "audio")
 LINES_JS = os.path.join(ROOT, "js", "lines.js")
 TEXTS = os.path.join(AUDIO, "texts.json")  # the words each take was recorded with
+PHOTOS = os.path.join(ROOT, "photos")       # photos attached to lines (bottle memories)
+
+
+def write_photo_manifest():
+    out = {}
+    for name in sorted(os.listdir(PHOTOS)):
+        base, ext = os.path.splitext(name)
+        if ext == ".jpg" and KEY_RE.match(base):
+            out[base] = f"photos/{name}?v={int(os.path.getmtime(os.path.join(PHOTOS, name)))}"
+    with open(os.path.join(PHOTOS, "manifest.js"), "w") as f:
+        f.write("// Written by tools/voice_server.py: photos attached to lines.\n")
+        f.write(f"const PHOTOS = {json.dumps(out, indent=1)};\n")
+    return out
 KEY_RE = re.compile(r"^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$")
 EXTS = (".m4a", ".wav")
 
@@ -114,6 +127,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         key = self.key_param()
         if not key:
             return self.reply(400, {"error": "bad key"})
+        if path == "/api/photo":  # body: an image (any format sips can read, incl. iPhone HEIC)
+            length = int(self.headers.get("Content-Length", 0))
+            if length < 100 or length > 40_000_000:
+                return self.reply(400, {"error": "bad image"})
+            with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                tmp.write(self.rfile.read(length))
+                src = tmp.name
+            out = os.path.join(PHOTOS, key + ".jpg")
+            r = subprocess.run(["sips", "-Z", "1100", "-s", "format", "jpeg", "-s", "formatOptions", "78", src, "--out", out],
+                               capture_output=True, timeout=60)
+            os.remove(src)
+            if r.returncode != 0 or not os.path.exists(out):
+                return self.reply(400, {"error": "Couldn't read that image."})
+            os.chmod(out, 0o644)
+            return self.reply(200, {"ok": True, "photos": write_photo_manifest()})
+        if path == "/api/photo-delete":
+            p = os.path.join(PHOTOS, key + ".jpg")
+            if os.path.exists(p):
+                os.remove(p)
+            return self.reply(200, {"ok": True, "photos": write_photo_manifest()})
         if path == "/api/delete":
             remove_key(key)
             texts = read_texts()
@@ -184,7 +217,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.makedirs(AUDIO, exist_ok=True)
+    os.makedirs(PHOTOS, exist_ok=True)
     write_manifest()
+    write_photo_manifest()
     # --lan: also reachable from your phone on the same Wi-Fi (anyone on that Wi-Fi can reach it too)
     lan = "--lan" in sys.argv
     server = http.server.ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", 8765), Handler)

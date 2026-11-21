@@ -58,6 +58,17 @@
     .mic-help.show { display: block; }
     .mic-help b { color: var(--gold); }
     #micBtn.on { background: var(--teal); }
+    @media (max-width: 600px) { /* phones: words on top, buttons underneath; header scrolls away */
+      header { position: static; }
+      .how { font-size: 14px; }
+      .row { flex-wrap: wrap; row-gap: 6px; }
+      .text { flex-basis: calc(100% - 40px); }
+      .row .status { order: -1; }
+      .row button.recbtn { margin-left: auto; }
+    }
+    .photo-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+    .photo-row img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 2px solid var(--gold); }
+    .photo-row button { background: #6a4c93; padding: 4px 12px; font-size: 14px; }
     .matched { font-size: 13px; color: var(--gold); margin-top: 4px; }
     .matched i { opacity: .75; }
     .matched a { color: #fff; font-weight: 800; margin-left: 6px; }
@@ -88,6 +99,7 @@
   <script src="js/lines.js"></script>
   <script>const Sfx = { muted: true };</script>
   <script src="audio/manifest.js"></script>
+  <script src="photos/manifest.js"></script>
   <script src="js/voice.js"></script>
   <script src="js/recorder.js"></script>
 </body>
