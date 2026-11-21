@@ -134,6 +134,7 @@ const BuenaVistaLevel = (() => {
     if (s.state === "swim") { s.swimT -= dt; if (s.swimT <= 0) { s.state = "drive"; s.invuln = 1.5; } }
     if (s.state === "drive") events(dt);
     updatePusher(dt);
+    updateBottles(dt);
     touchObjects();
     // rain fades out near the end; rainbow fades in
     if (s.dist > RAIN_STOPS) { s.rain = Math.max(0, s.rain - dt * 0.4); s.rainbow = Math.min(1, s.rainbow + dt * 0.35); }
@@ -279,6 +280,28 @@ const BuenaVistaLevel = (() => {
     };
     $("memoryBtn").addEventListener("click", close);
     s.closeMemory = close;
+  }
+
+  // Bottles can't be missed: they drift toward the raft, and if one slips past, it comes back ahead.
+  function updateBottles(dt) {
+    if (s.state === "intro" || s.state === "done") return;
+    for (const o of s.objs) {
+      if (o.type !== "bottle" || o.got) continue;
+      const ahead = o.wy - s.dist;
+      const [l, r] = banks(o.wy);
+      if (ahead > -20 && ahead < 300 && Math.abs(o.x - s.x) < 170) {
+        o.x += (s.x - o.x) * Math.min(1, dt * 2.2);
+      }
+      if (ahead < -70) { // went past it
+        o.wy = s.dist + 650;
+        o.x = clamp(s.x, banks(o.wy)[0] + 40, banks(o.wy)[1] - 40);
+        Engine.toast(L.bottleMissed);
+        Sfx.blip();
+      }
+      o.x = clamp(o.x, l + 20, r - 20);
+    }
+    // never let a rock sit right on top of a bottle
+    for (const o of s.objs) if (o.type === "rock" && !o.got && s.objs.some((b) => b.type === "bottle" && !b.got && Math.abs(b.wy - o.wy) < 60 && Math.abs(b.x - o.x) < o.r + 30)) o.got = true;
   }
 
   function hitRock(o) {

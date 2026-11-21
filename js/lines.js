@@ -248,6 +248,7 @@ const LINES = {
     pusherGiveUp: "Chad: ...fine. Next time.",
     grandparents: "YO JOHN, the RV grandparents are STILL floating.",
     bottleFound: "YO JOHN, a message in a bottle:",
+    bottleMissed: "YO JOHN, you missed a bottle. It came back.",
     keepPaddling: "Keep paddling",
     bottles: [
       "YO JOHN, (Placeholder memory #1: write a real memory of you two here!)",
