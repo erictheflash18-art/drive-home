@@ -521,8 +521,11 @@ const KenoshaLevel = (() => {
   function updateVan(dt) {
     const v = s.van;
     if (!v.on) return;
-    if (s.state === "drive") v.x += 290 * dt;
-    v.wheel = (v.wheel || 0) + 290 * dt / 12;
+    // Always a little faster than you: it creeps up the whole way down, and every mistake
+    // (rear-ending a truck, getting hit by a skier) lets it close in a lot.
+    const vSpeed = Math.max(290, (s.air ? s.vx : s.sp) + 20);
+    if (s.state === "drive") v.x += vSpeed * dt;
+    v.wheel = (v.wheel || 0) + vSpeed * dt / 12;
     if (s.state !== "drive") return;
     v.taunt -= dt;
     if (v.taunt <= 0) { v.taunt = rand(6, 9); Sfx.honk(); Engine.toast(pick(L.fratTaunts)); }
