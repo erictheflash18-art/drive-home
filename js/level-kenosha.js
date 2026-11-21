@@ -391,21 +391,19 @@ const KenoshaLevel = (() => {
     s.fuel = 100;
   }
 
+  // Grab the charm on the fly: no stopping. A moment later the frat guys show up behind you.
   async function gotCharm() {
     const me = s;
     s.charm = true;
-    s.state = "stopping";
-    ToePrompt.cancel();
     Sfx.fanfare();
     Confetti.burst(70, Engine.W);
-    await Engine.say(L.gotCharm);
+    Engine.toast(L.gotCharm, "good");
+    await wait(2500);
     if (me.dead) return;
     s.van.on = true;
-    s.van.x = s.x - 650;
+    s.van.x = s.x - 900;
     Sfx.honk();
-    await Engine.say(L.fratsAppear);
-    if (me.dead) return;
-    s.state = "drive";
+    for (const line of L.fratsAppear) Engine.toast(line, "bad");
   }
 
   async function finish() {
