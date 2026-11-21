@@ -160,6 +160,15 @@ const LINES = {
     ],
     rvGone: "YO JOHN, the RV FINALLY pulled over. Freedom.",
     rvNoJump: "YO JOHN, you can't jump an RV. It's too tall. Respect the RV.",
+    // Ramming the back of the RV: 1st and 2nd hit, then the 3rd blows it up
+    rvRam: [
+      "YO JOHN, you rammed the RV.",
+      "YO JOHN, the RV is smoking. One more.",
+    ],
+    rvBoom: [
+      "YO JOHN, YOU BLEW UP THE RV.",
+      "Don't worry. The grandparents parachuted out.",
+    ],
     rearEnd: [
       "YO JOHN, you rear-ended a semi.",
       "YO JOHN, the minivan is fine. You are not.",

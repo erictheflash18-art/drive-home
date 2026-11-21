@@ -265,6 +265,11 @@ const Sfx = {
   boost() { this.tone(300, 0.4, "sawtooth", 0.07, 0, 1200); },
   fanfare() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => this.tone(f, 0.18, "triangle", 0.13, i * 0.12)); },
   devils() { [392, 466, 523, 466, 392, 311].forEach((f, i) => this.tone(f, 0.11, "square", 0.06, i * 0.08)); },
+  boom() {
+    this.noise(1.4, 0.8);
+    this.tone(70, 1.2, "sawtooth", 0.25, 0, 30);
+    this.tone(140, 0.6, "square", 0.12, 0.05, 40);
+  },
   munch() { for (let i = 0; i < 5; i++) setTimeout(() => this.noise(0.08, 0.25), i * 220); },
 };
 

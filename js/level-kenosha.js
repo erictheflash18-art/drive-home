@@ -164,7 +164,8 @@ const KenoshaLevel = (() => {
     if (s.smallPending && s.zoom < 0.62) { s.smallPending = false; Engine.toast(pick(LINES.gotSmall), "water"); }
 
     const driving = s.state === "drive";
-    const gas = driving && Engine.input.right && s.fuel > 0;
+    s.dazeT = Math.max(0, (s.dazeT || 0) - dt);
+    const gas = driving && Engine.input.right && s.fuel > 0 && !(s.dazeT > 0);
     const brake = s.state === "stopping"; // no brake button anymore; only cutscenes stop the car
     const jumpHeld = driving && (Engine.input.left || Engine.input.up);
     if (jumpHeld && !s.jumpWas) s.jumpBuf = 0.15; // a press just before landing still counts
@@ -178,6 +179,8 @@ const KenoshaLevel = (() => {
     }
     if (driving) events(dt);
     updateRV(dt);
+    updateBoom(dt);
+    if (s.flash) s.flash = Math.max(0, s.flash - dt * 2.5);
     updateTraffic(dt);
     updateSkiers(dt);
     updateVan(dt);
@@ -438,8 +441,12 @@ const KenoshaLevel = (() => {
         r.taunt -= dt;
         if (r.taunt <= 0) { r.taunt = rand(5, 7); Sfx.honk(); Engine.toast(pick(L.rvTaunts)); }
       }
-      // no passing zone: you can't get past it
+      // no passing zone: you can't get past it... unless you ram it three times
       const limit = r.x - 95 - 38; // the back of the RV (ladder included)
+      if (s.x > limit && s.state === "drive" && (s.air ? s.vx : s.sp) > RV.speed + 60 && s.t - (r.lastRam || -9) > 0.5) {
+        ramRV(r, limit);
+        return;
+      }
       if (s.x > limit && s.air) { // tried to jump it
         s.x = limit; s.vx = Math.min(s.vx, RV.speed * 0.5);
         if (!r.noJumpSaid) { r.noJumpSaid = true; Engine.toast(L.rvNoJump, "bad"); }
@@ -451,6 +458,86 @@ const KenoshaLevel = (() => {
       }
     } else {
       r.pull = Math.min(1, r.pull + dt * 0.5);
+    }
+  }
+
+  function ramRV(r, limit) {
+    r.lastRam = s.t;
+    r.rams = (r.rams || 0) + 1;
+    s.x = limit - 4;
+    if (s.air) s.vx = -160; else s.sp = -280; // knocked backward...
+    s.dazeT = 0.8;                            // ...and dazed for a moment (no gas)
+    Sfx.crash();
+    Engine.shake = 6 + r.rams * 3;
+    s.floaters.push({ x: s.x + 40, y: s.y - 110, text: "RAM " + r.rams + "/3", t: 0 });
+    if (r.rams >= 3) return explodeRV(r);
+    Engine.toast(L.rvRam[r.rams - 1], "bad");
+  }
+
+  function explodeRV(r) {
+    r.exploded = true; r.pulled = true; r.pull = 1;
+    const cx = r.x, cy = gy(r.x) - 120;
+    const parts = [];
+    for (let i = 0; i < 40; i++) { // fireballs
+      const a = rand(0, Math.PI * 2), sp = rand(60, 380);
+      parts.push({ kind: "fire", x: cx + rand(-60, 60), y: cy + rand(-80, 80), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120,
+        r: rand(18, 46), life: rand(0.7, 1.6), t: 0, c: pick(["#ffbe0b", "#fb5607", "#ff006e", "#ffd23f"]) });
+    }
+    for (let i = 0; i < 22; i++) { // debris: panels, a kayak, bike wheels
+      const kind = i === 0 ? "kayak" : i < 4 ? "wheel" : "panel";
+      parts.push({ kind, x: cx + rand(-60, 60), y: cy + rand(-100, 40), vx: rand(-260, 320), vy: rand(-620, -260),
+        rot: 0, vr: rand(-8, 8), life: 3.5, t: 0, c: pick(["#f1f3f5", "#8d5b3b", "#9cc5de", "#e9c46a"]) });
+    }
+    for (let i = 0; i < 2; i++) { // the grandparents, parachuting to safety
+      parts.push({ kind: "chute", x: cx - 30 + i * 60, y: cy - 140, vx: -40 + i * 30, vy: -60, life: 7, t: 0, c: i ? "#f15bb5" : "#3a86ff" });
+    }
+    s.boom = parts;
+    s.flash = 1;
+    Sfx.boom();
+    Engine.shake = 18;
+    s.carsTotalled++; Save.bump("carsTotalled");
+    s.floaters.push({ x: cx, y: cy - 160, text: "CARS TOTALLED: " + s.carsTotalled, t: 0 });
+    for (const line of L.rvBoom) Engine.toast(line, "good");
+  }
+
+  function updateBoom(dt) {
+    if (!s.boom) return;
+    for (const p of s.boom) {
+      p.t += dt;
+      if (p.kind === "chute") { p.vy += (-25 - p.vy) * dt; p.x += p.vx * dt; p.y += p.vy * dt; continue; }
+      p.vy += (p.kind === "fire" ? -60 : 700) * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.kind === "fire") { p.vx *= 1 - dt * 2; p.vy *= 1 - dt * 2; }
+      if (p.rot !== undefined) p.rot += p.vr * dt;
+    }
+    s.boom = s.boom.filter((p) => p.t < p.life);
+    if (!s.boom.length) s.boom = null;
+  }
+
+  function drawBoom(ctx) {
+    for (const p of s.boom || []) {
+      const k = p.t / p.life;
+      ctx.save();
+      if (p.kind === "fire") {
+        ctx.globalAlpha = Math.max(0, 1 - k);
+        ctx.fillStyle = k > 0.6 ? "rgba(90,90,90,.8)" : p.c;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.6 + k * 1.2), 0, Math.PI * 2); ctx.fill();
+      } else if (p.kind === "chute") {
+        ctx.globalAlpha = Math.min(1, (p.life - p.t));
+        ctx.translate(p.x, p.y + Math.sin(p.t * 2) * 4);
+        ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(0, -30, 26, Math.PI, 0); ctx.fill();
+        ctx.strokeStyle = "#555"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-26, -30); ctx.lineTo(0, 4); ctx.lineTo(26, -30); ctx.moveTo(0, -30); ctx.lineTo(0, 4); ctx.stroke();
+        ctx.fillStyle = "#e9ecef"; ctx.beginPath(); ctx.arc(0, 2, 5, 0, Math.PI * 2); ctx.fill();   // gray hair
+        ctx.fillStyle = p.c; ctx.fillRect(-4, 6, 8, 12);
+      } else {
+        ctx.globalAlpha = Math.min(1, (p.life - p.t) * 2);
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        if (p.kind === "kayak") { ctx.fillStyle = "#f77f00"; ctx.beginPath(); ctx.ellipse(0, 0, 60, 8, 0, 0, Math.PI * 2); ctx.fill(); }
+        else if (p.kind === "wheel") { ctx.strokeStyle = "#333"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.stroke(); }
+        else { ctx.fillStyle = p.c; ctx.fillRect(-14, -9, 28, 18); }
+      }
+      ctx.restore();
     }
   }
 
@@ -667,7 +754,13 @@ const KenoshaLevel = (() => {
       ctx.scale(1 - r.pull * 0.3, 1 - r.pull * 0.3);
       Art.sideRV(ctx, r.wheel || 0);
       ctx.restore();
+      for (let i = 0; i < (r.rams || 0) * 3; i++) { // it's been rammed: smoke out the back
+        const q = (s.t * 0.7 + i / ((r.rams || 1) * 3)) % 1;
+        ctx.fillStyle = `rgba(80,80,80,${0.5 * (1 - q)})`;
+        ctx.beginPath(); ctx.arc(r.x - 80 - q * 60 + Math.sin(i) * 10, gy(r.x) - 60 - q * 160, 10 + q * 26, 0, Math.PI * 2); ctx.fill();
+      }
     }
+    drawBoom(ctx);
     // frat van
     const v = s.van;
     if (v.on && v.x > x0 - 100 && v.x < x1 + 100) {
@@ -712,6 +805,7 @@ const KenoshaLevel = (() => {
       g.addColorStop(0, "rgba(78,168,222,0)"); g.addColorStop(1, `rgba(78,168,222,${(1 - s.zoom) * 0.8})`);
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     }
+    if (s.flash) { ctx.fillStyle = `rgba(255,245,220,${s.flash * 0.8})`; ctx.fillRect(0, 0, W, H); }
     fuelGauge(ctx);
     vanWarning(ctx, z);
     Confetti.draw(ctx);
@@ -766,6 +860,13 @@ const KenoshaLevel = (() => {
     if (s.invuln > 0 && Math.floor(s.t * 12) % 2) ctx.globalAlpha = 0.45;
     Art.sideCar(ctx, s.wheel);
     ctx.restore();
+    if (s.dazeT > 0) { // seeing stars
+      ctx.font = "16px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let i = 0; i < 3; i++) {
+        const a = s.t * 6 + i * 2.1;
+        ctx.fillText("⭐", s.x + Math.cos(a) * 22, s.y - 78 + Math.sin(a) * 7);
+      }
+    }
     if (crashing) {
       ctx.fillStyle = "rgba(120,120,120,.5)";
       for (let i = 0; i < 4; i++) {
