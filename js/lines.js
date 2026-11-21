@@ -237,7 +237,7 @@ const LINES = {
       "It's Chad from ΣΤΓ. He's paddling over.",
       "Chad is back, Reese. Paddle away from Chad.",
       "CHAD does not give up bro. We're stealing his beer so I know why.",
-      "He's back for ONE more try, Reece.",
+      "He's back for ONE more try, Reese.",
     ],
     chadFalls: [
       "Damn. Chad fucking fell in. What a loser.",
