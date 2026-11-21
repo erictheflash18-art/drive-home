@@ -14,6 +14,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.parse
@@ -184,7 +185,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     os.makedirs(AUDIO, exist_ok=True)
     write_manifest()
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 8765), Handler)
+    # --lan: also reachable from your phone on the same Wi-Fi (anyone on that Wi-Fi can reach it too)
+    lan = "--lan" in sys.argv
+    server = http.server.ThreadingHTTPServer(("0.0.0.0" if lan else "127.0.0.1", 8765), Handler)
     print("Recording page: http://localhost:8765/record.html")
     print("Game:           http://localhost:8765/?preview")
+    if lan:
+        ip = subprocess.run(["ipconfig", "getifaddr", "en0"], capture_output=True, text=True).stdout.strip()
+        print(f"On your phone:  http://{ip}:8765/?preview   and   http://{ip}:8765/record.html")
     server.serve_forever()

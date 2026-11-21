@@ -185,6 +185,9 @@ const Rec = {
     if (!this.lines[this.sel].voiced) return this.error("That one's a sign/label, so it's text only.");
     if (this.recording !== null) return this.stopRec();
     this.error("");
+    if (!navigator.mediaDevices || !window.isSecureContext) {
+      return this.error("Recording only works on the computer (phones need a secure https link for the mic). You can still edit lines and play clips here.");
+    }
     try {
       if (!this.stream) {
         this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
