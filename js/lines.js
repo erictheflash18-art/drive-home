@@ -128,7 +128,7 @@ const LINES = {
     ],
     finalSign: "US-285 SOUTH → Durango",
     note:
-      "Happy birthday Reese. In 5 days you'll be done. Hopefully this game that you need to complete to get your gift certificate brings you something these next 5 days. I love you.",
+      "Happy birthday Reese. In 5 days hopefully you'll be done. Hopefully this game that you need to complete your gift certificate brings you something. Love you.",
   },
 
   // ---------------- FUTURE LEVELS (not built yet) ----------------
@@ -237,16 +237,16 @@ const LINES = {
       "It's Chad from ΣΤΓ. He's paddling over.",
       "Chad is back, Reese. Paddle away from Chad.",
       "CHAD does not give up bro. We're stealing his beer so I know why.",
-      "YO JOHN, Chad is back for ONE more try.",
+      "He's back for ONE more try, Reece.",
     ],
     chadFalls: [
-      "YO JOHN... Chad fell in.",
-      "THE WATER IS COLD, CHAD.",
+      "Damn. Chad fucking fell in. What a loser.",
+      "YEAH, ISN'T THE WATER COLD, EH?",
     ],
-    monsterSeen: "YO JOHN... did you see that?",
+    monsterSeen: "Did you see that?",
     hotSpringsSign: "Hot springs ♨",
-    hotSprings: "YO JOHN... the water is... warm?",
-    hotSpringsMiss: "YO JOHN, you missed the only warm water in Colorado.",
+    hotSprings: "This water is warm?",
+    hotSpringsMiss: "I'm so disappointed.",
     shake: "*shake shake shake*",
     pusherTaunts: [
       "YOU KNOW, JUST HOP IN, IT IS REFRESHING.",
@@ -290,5 +290,5 @@ const LINES = {
   durango: { name: "Durango" },
 
   comingSoon: "YO JOHN, this part of the road is still being paved. Check back soon.",
-  birthday: "YO JOHN, HAPPY BIRTHDAY!",
+  birthday: "HAPPY BIRTHDAY!",
 };
