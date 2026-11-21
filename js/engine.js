@@ -24,7 +24,10 @@ const Engine = {
     this.bindInput();
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) this.input.left = this.input.right = false;
+      else if (Sfx.ac && Sfx.ac.state !== "running") { try { Sfx.ac.resume(); } catch (e) {} } // back from another app
     });
+    // iOS only lets sound start inside these kinds of taps
+    for (const ev of ["touchend", "click", "keydown"]) document.addEventListener(ev, () => Sfx.unlock(), { passive: true });
     let last = performance.now();
     const frame = (now) => {
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -195,11 +198,33 @@ const Engine = {
 const Sfx = {
   ac: null,
   muted: false,
+  // iPhone audio, two quirks:
+  //  1. Web audio is silenced by the ring/silent switch unless the page says it's media
+  //     playback (navigator.audioSession on iOS 16.4+; on older iOS, a silent <audio> track
+  //     playing in the background does the same job).
+  //  2. Sound can only start inside certain taps (click / touchend / keydown), so unlock()
+  //     is also called on every one of those (see Engine.init).
   unlock() {
+    try {
+      if (navigator.audioSession && navigator.audioSession.type !== "playback") navigator.audioSession.type = "playback";
+    } catch (e) {}
     if (!this.ac) {
       try { this.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
     }
-    if (this.ac.state === "suspended") this.ac.resume();
+    if (this.ac.state !== "running") { try { this.ac.resume(); } catch (e) {} }
+    const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (iOS && !navigator.audioSession && !this.keepAlive) {
+      try {
+        const a = document.createElement("audio");
+        a.src = URL.createObjectURL(silentWav());
+        a.loop = true;
+        a.setAttribute("playsinline", "");
+        a.volume = 0.01;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => { this.keepAlive = null; });
+        this.keepAlive = a;
+      } catch (e) {}
+    }
   },
   tone(freq, dur, type, vol, delay, slideTo) {
     if (this.muted || !this.ac) return;
@@ -242,6 +267,20 @@ const Sfx = {
   devils() { [392, 466, 523, 466, 392, 311].forEach((f, i) => this.tone(f, 0.11, "square", 0.06, i * 0.08)); },
   munch() { for (let i = 0; i < 5; i++) setTimeout(() => this.noise(0.08, 0.25), i * 220); },
 };
+
+// Half a second of silence as a WAV file (for the older-iPhone audio trick above)
+function silentWav() {
+  const rate = 8000, n = rate / 2;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); v.setUint32(4, 36 + n, true); str(8, "WAVE"); str(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  str(36, "data"); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  return new Blob([buf], { type: "audio/wav" });
+}
 
 // ---- HOOK THE TOE: shared by every level ----
 // toePrompt.start(onResult) shows the button; she has `window` seconds to hit it.
