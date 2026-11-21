@@ -10,7 +10,10 @@ const STOPS = [
 ];
 const BIRTHDAY = Date.UTC(2026, 10, 25, 7);
 
-const PREVIEW = new URLSearchParams(location.search).has("preview");
+// Preview mode (everything unlocked, separate save): ?preview on the live site, and always
+// on the local copy (localhost), which only runs on this computer.
+const PREVIEW = new URLSearchParams(location.search).has("preview") ||
+  location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
 function unlockTime(stop) {
   return Date.UTC(2026, 10, stop.day, 7); // month 10 = November
