@@ -35,8 +35,7 @@ def transcribe(audio_path, hint=""):
         subprocess.run(["afconvert", audio_path, wav, "-f", "WAVE", "-d", "LEI16@16000", "-c", "1"],
                        check=True, capture_output=True, timeout=60)
         cmd = ["whisper-cli", "-m", MODEL, "-f", wav, "-nt", "-np"]
-        if hint:
-            cmd += ["--prompt", hint]
+        cmd += ["--prompt", (hint + " " if hint else "") + "Reese, YO JOHN, Chad."]  # names it should know
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=120).stdout
     return " ".join(out.split())
 
@@ -51,6 +50,9 @@ def style(heard, original):
     if not h:
         return original
     h = re.sub(r"\byo[,.!]?\s+john\b", "YO JOHN", h, flags=re.I)
+    # her name, however whisper hears it
+    h = re.sub(r"\b(REECE|RHYS|REES)\b", "REESE", h)
+    h = re.sub(r"\b(Reece|Rhys|Rees|reece|rhys)\b", "Reese", h)
     letters = [c for c in original if c.isalpha()]
     if letters and all(c.isupper() for c in letters):
         return h.upper()

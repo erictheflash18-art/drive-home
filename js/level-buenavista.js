@@ -17,6 +17,8 @@ const BuenaVistaLevel = (() => {
   const RAIN_STOPS = 16700;
   const CHARM = 17500;
   const RAFT_R = 30;
+  const CHAD_FINALE = 16950;          // Chad's last try (he falls in)
+  const HOT_SPRINGS = FINISH - 1000;  // a toe in the hot springs
   // Beer. Lots of beer. (calm water, not in the lazy stretches)
   const BEERS = [900, 1500, 2100, 4300, 4800, 6800, 9300, 9900, 11800, 14200, 14700, 15000, 16900, 17200];
 
@@ -136,7 +138,7 @@ const BuenaVistaLevel = (() => {
       // in the calm stretches paddling only nudges you along, so the scenes don't fly by
       const lz = lazyAmount(s.dist);
       if (lz > 0) s.boost = Math.min(s.boost, 170 * (1 - lz) + 16 * lz);
-      const v = s.state === "done" ? cur * 0.4 : cur + s.boost;
+      const v = s.state === "arrive" ? clamp((FINISH - s.dist) * 0.9, 0, 120) : s.state === "done" ? 0 : cur + s.boost;
       s.dist += v * dt;
       // the river carries you around its bends
       s.x += (cx(s.dist) - cx(s.dist - v * dt)) * 0.85;
@@ -152,6 +154,8 @@ const BuenaVistaLevel = (() => {
     }
     if (s.state === "swim") { s.swimT -= dt; if (s.swimT <= 0) { s.state = "drive"; s.invuln = 1.5; } }
     if (s.state === "drive") events(dt);
+    if (s.state === "arrive") arrive(dt);
+    music(dt);
     updateMonster(dt);
     updatePusher(dt);
     updateBottles(dt);
@@ -172,7 +176,7 @@ const BuenaVistaLevel = (() => {
   }
 
   function events(dt) {
-    if (!ToePrompt.active && !inLazy(s.dist)) {
+    if (!ToePrompt.active && !inLazy(s.dist) && Math.abs(s.dist - HOT_SPRINGS) > 500) {
       s.nextToe -= dt;
       if (s.nextToe <= 0) { startToe(); s.nextToe = rand(12, 18); }
     }
@@ -182,7 +186,16 @@ const BuenaVistaLevel = (() => {
     PUSHERS.forEach((wy, i) => { if (!s.flags["p" + i] && s.dist > wy) { s.flags["p" + i] = true; spawnPusher(i); } });
     if (!s.flags.gp && s.dist > GRANDPARENTS) { s.flags.gp = true; s.gp = 0; Engine.toast(L.grandparents); }
     if (!s.flags.rainStop && s.dist > RAIN_STOPS) { s.flags.rainStop = true; Sfx.rainStop(4); Engine.toast(L.rainStops, "good"); }
-    if (s.dist >= FINISH) finish();
+    if (!s.flags.finale && s.dist > CHAD_FINALE && !s.pusher) { s.flags.finale = true; spawnPusher(3, true); }
+    if (!s.flags.hot && s.dist > HOT_SPRINGS - 60) {
+      s.flags.hot = true;
+      ToePrompt.cancel();
+      ToePrompt.start((ok) => {
+        if (ok) { s.toes++; s.hotTried = true; setTimeout(() => Engine.toast(L.hotSprings, "good"), 900); }
+        else Engine.toast(L.hotSpringsMiss);
+      }, 3);
+    }
+    if (s.dist >= FINISH - 230) finish();
   }
 
   function startToe(win) {
@@ -193,8 +206,8 @@ const BuenaVistaLevel = (() => {
   }
 
   // ---------- Chad from ΣΤΓ ----------
-  function spawnPusher(i) {
-    s.pusher = { wy: s.dist - 380, x: s.x + (s.x < cx(s.dist) ? 70 : -70), i, t: 0, taunt: 1.2, done: false, fade: 0, phase: "approach" };
+  function spawnPusher(i, finale) {
+    s.pusher = { wy: s.dist - 380, x: s.x + (s.x < cx(s.dist) ? 70 : -70), i, t: 0, taunt: 1.2, done: false, fade: 0, phase: "approach", finale };
     Engine.toast(L.pusherAppear[i] || L.pusherAppear[0], "bad");
     Sfx.honk();
   }
@@ -214,6 +227,7 @@ const BuenaVistaLevel = (() => {
         if (Math.abs(dy - 95) < 25 && s.state === "drive") {
           p.phase = "windup"; p.wt = 0.95 - p.i * 0.1;
           p.tx = s.x; // he's aiming at where you are RIGHT NOW: move!
+          if (p.finale) { const [bl, br] = banks(s.dist); p.tx = s.x + (s.x - bl > br - s.x ? -95 : 95); } // he whiffs
           Engine.toast(L.pusherWindup, "bad"); Sfx.alarm();
         }
       } else if (p.phase === "windup") {
@@ -223,8 +237,12 @@ const BuenaVistaLevel = (() => {
       } else {
         p.wy += (yours + 300) * dt;
         p.x += clamp(p.tx - p.x, -170 * dt, 170 * dt);
-        if (s.state === "drive" && s.invuln <= 0 && Math.abs(dy) < 50 && Math.abs(s.x - p.x) < 38) pushIn(p);
-        if (dy < -110) { p.done = true; if (!p.got) Engine.toast(L.pusherGiveUp, "good"); }
+        if (!p.finale && s.state === "drive" && s.invuln <= 0 && Math.abs(dy) < 50 && Math.abs(s.x - p.x) < 38) pushIn(p);
+        if (p.finale && dy < -30) { // overshoots... and goes in
+          p.done = true; p.fell = true;
+          Sfx.splash(); Engine.shake = 4;
+          for (const line of L.chadFalls) Engine.toast(line, "good");
+        } else if (dy < -110) { p.done = true; if (!p.got) Engine.toast(L.pusherGiveUp, "good"); }
       }
       p.x = clamp(p.x, l + RAFT_R, rt - RAFT_R);
       p.taunt -= dt;
@@ -365,10 +383,28 @@ const BuenaVistaLevel = (() => {
     Engine.toast(pick(L.rockHit), "bad");
   }
 
+  // ---------- Arrival: pull up to the boat ramp, hop out, shake off ----------
+  function rampX() { return banks(FINISH)[1] - 34; }
+  function arrive(dt) {
+    s.arriveT += dt;
+    s.x += (rampX() - 40 - s.x) * Math.min(1, dt * 1.6);
+    s.vx = 0; s.spin *= 0.9;
+  }
+
   async function finish() {
     const me = s;
-    s.state = "done";
+    s.state = "arrive"; s.arriveT = 0;
     ToePrompt.cancel();
+    if (s.pusher && !s.pusher.fell) s.pusher.done = true;
+    await wait(2600);
+    if (me.dead) return;
+    s.hopped = 0.001; Sfx.tone(400, 0.12, "triangle", 0.1, 0, 700);  // hop!
+    await wait(500);
+    if (me.dead) return;
+    Sfx.noise(0.6, 0.15, true); Engine.toast(L.shake);
+    await wait(1400);
+    if (me.dead) return;
+    s.state = "done";
     Sfx.fanfare();
     Confetti.burst(160, Engine.W);
     await wait(2200);
@@ -446,11 +482,32 @@ const BuenaVistaLevel = (() => {
     // rapid signs on the bank
     RAPIDS.forEach(([a, , n]) => bankSign(ctx, a - 300, L.signs[n], -1));
     bankSign(ctx, FINISH - 250, L.signs[3], 1);
-    // take-out ramp at the finish
+    // hot springs on the left bank, steaming
+    const hy = sy(HOT_SPRINGS);
+    if (hy > top - 80 && hy < bot + 80) {
+      const [l] = banks(HOT_SPRINGS);
+      const hx = Math.max(38, l - 18);
+      ctx.fillStyle = "#8d8378"; ctx.beginPath(); ctx.ellipse(hx, hy, 40, 28, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#6ad1c8"; ctx.beginPath(); ctx.ellipse(hx, hy, 32, 21, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.beginPath(); ctx.ellipse(hx - 8, hy - 6, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
+      for (let i = 0; i < 4; i++) {
+        const q = (s.t * 0.5 + i / 4) % 1;
+        ctx.fillStyle = `rgba(255,255,255,${0.45 * (1 - q)})`;
+        ctx.beginPath(); ctx.arc(hx - 14 + i * 9 + Math.sin(s.t + i) * 5, hy - 10 - q * 60, 7 + q * 12, 0, Math.PI * 2); ctx.fill();
+      }
+      bankSign(ctx, HOT_SPRINGS - 70, L.hotSpringsSign, -1);
+      if (s.hotTried) { ctx.font = "800 15px 'Baloo 2', sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.fillText("ahhh", hx, hy - 34); }
+    }
+    // boat ramp + dock at the take-out
     const fy = sy(FINISH);
-    if (fy > top && fy < bot) {
-      const [l, r] = banks(FINISH);
-      for (let x = l; x < r; x += 16) { ctx.fillStyle = (Math.floor(x / 16) % 2) ? "#fff" : "#e63946"; ctx.fillRect(x, fy - 4, 16, 8); }
+    if (fy > top - 80 && fy < bot + 80) {
+      const rx = rampX();
+      ctx.fillStyle = "#b8b2a7"; ctx.beginPath();
+      ctx.moveTo(rx - 22, fy - 40); ctx.lineTo(Engine.W + 20, fy - 46); ctx.lineTo(Engine.W + 20, fy + 46); ctx.lineTo(rx - 22, fy + 40); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "#9a948a"; ctx.lineWidth = 2;
+      for (let x = rx - 14; x < Engine.W; x += 12) { ctx.beginPath(); ctx.moveTo(x, fy - 40); ctx.lineTo(x, fy + 40); ctx.stroke(); }
+      ctx.fillStyle = "#8d6e53"; ctx.fillRect(rx - 60, fy + 44, 70, 14);                // little dock
+      ctx.fillStyle = "#5c4033"; ctx.fillRect(rx - 60, fy + 44, 4, 14); ctx.fillRect(rx + 6, fy + 44, 4, 14);
     }
 
     // the memories' scenes on the banks (before each bottle)
@@ -474,6 +531,7 @@ const BuenaVistaLevel = (() => {
     if (p) {
       ctx.save(); ctx.globalAlpha = 1 - p.fade;
       raft(ctx, p.x, sy(p.wy), Math.sin(s.t * 3) * 0.1 + (p.phase === "windup" ? Math.sin(s.t * 30) * 0.12 : 0), "#e63946", false, s.t);
+      if (p.fell) chadSwim(ctx, p.x + 46, sy(p.wy) + 6);
       if (p.phase === "windup") {
         ctx.font = "800 26px 'Baloo 2', sans-serif"; ctx.textAlign = "center";
         ctx.lineWidth = 5; ctx.strokeStyle = "#fff"; ctx.strokeText("!!", p.x, sy(p.wy) - 52);
@@ -483,7 +541,8 @@ const BuenaVistaLevel = (() => {
     }
     // the penguin's raft (or the penguin in the water)
     const swimming = s.state === "swim";
-    raft(ctx, s.x, py, s.ang, "#ffbe0b", !swimming, s.t);
+    raft(ctx, s.x, py, s.ang, "#ffbe0b", !swimming && !s.hopped, s.t);
+    if (s.hopped) hoppedOut(ctx);
     if (swimming) swimmer(ctx, s.x + 44, py + 10);
     drawBridge(ctx, top, bot); // over the raft: you float under it
     ctx.restore();
@@ -744,6 +803,7 @@ const BuenaVistaLevel = (() => {
     }
     m.t += dt;
     m.x += m.dir * 52 * dt;
+    if (!s.flags.monsterSeen && m.t > 2 && m.x > 40 && m.x < Engine.W - 40) { s.flags.monsterSeen = true; Engine.toast(L.monsterSeen); }
     if ((m.dir > 0 && m.x > Engine.W + 200) || (m.dir < 0 && m.x < -200) || sy(m.wy) > Engine.H + 200) {
       s.monster = null; s.nextMonster = rand(25, 45);
     }
@@ -763,6 +823,56 @@ const BuenaVistaLevel = (() => {
     ctx.beginPath(); ctx.ellipse(28, Math.sin(s.t * 2 + 0.7) * 10, 22, 14, 0, 0, Math.PI * 2); ctx.fill(); // head
     for (const fy of [-1, 1]) { ctx.beginPath(); ctx.ellipse(-20, fy * 22 + Math.sin(s.t * 2) * 6, 16, 6, fy * 0.6, 0, Math.PI * 2); ctx.fill(); } // fins
     ctx.restore();
+  }
+
+  // The penguin standing on the boat ramp, shaking off the river
+  function hoppedOut(ctx) {
+    s.hopped += 1 / 60;
+    const k = Math.min(1, s.hopped / 0.35);
+    const x = s.x + (rampX() + 6 - s.x) * k, y = P() - Math.sin(k * Math.PI) * 34;
+    const shaking = s.hopped > 0.5 && s.hopped < 2;
+    const wob = shaking ? Math.sin(s.t * 40) * 0.35 : 0;
+    if (shaking) {
+      ctx.fillStyle = "rgba(160,215,255,.9)";
+      for (let i = 0; i < 10; i++) {
+        const a = i / 10 * Math.PI * 2 + s.t * 3, d = 18 + ((s.t * 90 + i * 13) % 26);
+        ctx.beginPath(); ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 2.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.save(); ctx.translate(x, y); ctx.rotate(wob);
+    ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(3, 5, 14, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.ellipse(0, 0, 13, 15, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(0, -4, 8, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f7a21b"; ctx.beginPath(); ctx.moveTo(-3, -9); ctx.lineTo(3, -9); ctx.lineTo(0, -16); ctx.fill();
+    ctx.fillStyle = "#9b5de5"; ctx.beginPath(); ctx.arc(0, 6, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f15bb5"; ctx.beginPath(); ctx.arc(0, 6, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1b1f2e"; ctx.beginPath(); ctx.ellipse(-14, 2, 4, 9, 0.4 + wob, 0, Math.PI * 2); ctx.ellipse(14, 2, 4, 9, -0.4 - wob, 0, Math.PI * 2); ctx.fill(); // flippers
+    ctx.restore();
+  }
+
+  // Soft music that fades in during the calm stretches (and stays for the arrival)
+  const MELODY = [523, 659, 784, 659, 587, 523, 440, 523, 659, 784, 880, 784, 659, 587, 523, 587];
+  function music(dt) {
+    const lz = s.state === "arrive" || s.state === "done" ? 1 : lazyAmount(s.dist);
+    s.musicVol = (s.musicVol || 0) + (lz - (s.musicVol || 0)) * Math.min(1, dt * 0.8);
+    if (s.musicVol < 0.05 || Sfx.muted || Engine.paused) return;
+    s.noteT = (s.noteT || 0) - dt;
+    if (s.noteT > 0) return;
+    s.noteT = 0.42;
+    s.noteI = ((s.noteI || 0) + 1) % MELODY.length;
+    const v = 0.045 * s.musicVol;
+    Sfx.tone(MELODY[s.noteI], 0.9, "triangle", v);
+    if (s.noteI % 4 === 0) Sfx.tone(MELODY[s.noteI] / 4, 1.6, "sine", v * 1.4);
+  }
+
+  function chadSwim(ctx, x, y) {
+    ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) { const q = (s.t * 1.5 + i / 3) % 1; ctx.globalAlpha = 1 - q; ctx.beginPath(); ctx.arc(x, y, 10 + q * 24, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#ffd7b5"; ctx.beginPath(); ctx.arc(x, y + Math.sin(s.t * 9) * 2, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#7b1e3a"; ctx.beginPath(); ctx.arc(x, y + 2, 9, 0, Math.PI); ctx.fill();
+    ctx.font = "800 15px 'Baloo 2', sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+    ctx.fillText(Math.floor(s.t * 4) % 2 ? "BRRR" : "COLD", x, y - 22);
   }
 
   function swimmer(ctx, x, y) {
