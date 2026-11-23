@@ -11,7 +11,7 @@ const SECTION_NAMES = {
 };
 
 // Lines that can have a photo attached (the memories in the bottles)
-const PHOTO_LINE = /\.bottles\.\d+$/;
+const PHOTO_LINE = /\.(bottles|memories)\.\d+$/;
 
 const Rec = {
   lines: Voice.allLines(true),
