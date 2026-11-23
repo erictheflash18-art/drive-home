@@ -7,7 +7,7 @@
 const WolfCreekLevel = (() => {
   const L = LINES.wolfCreek;
   const FINISH = 50000;
-  const HALF = 250;               // half the width of the run
+  const HALF = 620;               // half the width of the open mountain (dune walls beyond)
   const D0 = 300;                 // camera focal length (world units)
   const VIEW = 2600;              // how far ahead we draw
   const POWDER = [0, 9000], GLADES = [9000, 15000], CREEK = 15600, PILLOWS = [19800, 26000];
@@ -20,6 +20,11 @@ const WolfCreekLevel = (() => {
   const CLEARS = 47200, CHARM = 48200;
   const SNICKERS = [3600, 7400, 13000, 21000, 28800, 36800, 40200, 45600];
   const SKIER_R = 16;
+  const G = 900;                  // gravity
+  const DRAG = 0.0013;            // air + snow drag (top speed ~370 on a normal pitch)
+  const CLIFF_DROP = [120, 165];
+  const CHUTES = (c) => [-2, -1, 0, 1, 2].map((k) => cx(c) + k * 400 + 90); // ramps through each cliff band
+  const ROLLERS = [[5200, 8200], [19800, 21800], [37600, 40200]];
 
   let s;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -31,13 +36,52 @@ const WolfCreekLevel = (() => {
 
   // the run winds gently
   function cx(z) { return 140 * Math.sin(z / 2100) + 50 * Math.sin(z / 730 + 2); }
-  // 3D height of the snow: downhill, soft rolls on the run, big powder dunes off to the sides
+  // How steep the mountain is at each point (drives speed): flatter in the calm bowls, steeper
+  // on the ice and the avalanche run, flattening out to the road.
+  function pitch(z) {
+    let p = 0.2;
+    if (within(z, POWDER)) p = 0.19;
+    else if (onIce(z)) p = 0.26;
+    else if (z > CHAD_FINALE) p = 0.24;
+    const c = calmAmount(z);
+    p = p * (1 - c) + 0.07 * c;
+    if (z > FINISH - 1800) p = Math.max(0.02, p * clamp((FINISH - z) / 1800, 0, 1));
+    return p;
+  }
+  // base height = the integral of the pitch (table, 20 units per step)
+  const BASE = (() => {
+    const a = new Float32Array(Math.ceil((FINISH + 6000) / 20) + 2);
+    let h = 0;
+    for (let i = 0; i < a.length; i++) { a[i] = h; h -= pitch(i * 20 - 1000) * 20; }
+    return a;
+  })();
+  function base(z) {
+    const f = (z + 1000) / 20, i = clamp(Math.floor(f), 0, BASE.length - 2), u = clamp(f - i, 0, 1);
+    return BASE[i] + (BASE[i + 1] - BASE[i]) * u + (z < -1000 ? -0.2 * (z + 1000) : 0);
+  }
+  const smooth = (e0, e1, v) => { const u = clamp((v - e0) / (e1 - e0), 0, 1); return u * u * (3 - 2 * u); };
+  // 3D height of the snow: uneven rolls, ridges and gullies, rollers, real cliffs, dune walls
   function ground(x, z) {
     const out = Math.max(0, Math.abs(x - cx(z)) - (HALF - 40));
-    const roll = 11 * Math.sin(x / 120 + z / 420) + 6 * Math.sin(x / 53 - z / 210) + 4 * Math.sin(z / 150);
+    const roll = 14 * Math.sin(x / 130 + z / 460) + 8 * Math.sin(x / 57 - z / 230) + 6 * Math.sin(z / 170 + x / 300);
+    const rv = 1 - Math.abs(Math.sin(x / 210 + 0.6 * Math.sin(z / 700)));
+    const ridge = 20 * rv * rv;
+    let roller = 0;
+    for (const r of ROLLERS) if (z > r[0] && z < r[1]) roller += 26 * Math.pow(Math.max(0, Math.sin((z - r[0]) / 110)), 4) * smooth(r[0], r[0] + 300, z) * smooth(r[1], r[1] - 300, z);
+    let cliff = 0;
+    CLIFFS.forEach((c, i) => {
+      if (z < c - 20) return;
+      const d = Math.min(...CHUTES(c).map((q) => Math.abs(x - q)));
+      const ramp = smooth(60, 120, d);           // 0 in a chute (gentle ramp), 1 on the face
+      const w = 16 + (1 - ramp) * 300;
+      cliff -= CLIFF_DROP[i] * smooth(c, c + w, z);
+    });
     const dune = Math.min(1, out / 140) * (40 * Math.pow(Math.sin(x / 150 + z / 330), 2) + 22 * Math.sin(x / 61 + z / 170));
-    return -0.2 * z + roll * (1 - Math.min(1, out / 80) * 0.5) + out * 0.32 + out * out * 0.0012 + dune;
+    const calm = 1 - 0.6 * calmAmount(z);
+    return base(z) + (roll + ridge + roller) * calm + cliff + out * 0.35 + out * out * 0.0014 + dune;
   }
+  const gradX = (x, z) => (ground(x + 3, z) - ground(x - 3, z)) / 6;
+  const gradZ = (x, z) => (ground(x, z + 3) - ground(x, z - 3)) / 6;
   // trees and boulders off the run (3D view only)
   function edgeScenery() {
     const e = [];
@@ -55,27 +99,17 @@ const WolfCreekLevel = (() => {
     return e;
   }
 
-  function targetSpeed(z) {
-    let v = 330;
-    if (within(z, POWDER)) v = 290;
-    else if (within(z, GLADES)) v = 300;
-    else if (onIce(z)) v = 390;
-    else if (z > CHAD_FINALE) v = 380;
-    const c = calmAmount(z);
-    v = v * (1 - c) + 190 * c;
-    if (z > FINISH - 1200) v = Math.min(v, Math.max(40, (FINISH - 60 - z) * 0.45));
-    return v;
-  }
-
   // ---------- Setup ----------
   function reset() {
     s = {
       z: 0, x: 0, vx: 0, v: 0, boost: 0, boostT: 0, h: 0, vh: 0, air: false, lean: 0, camX: 0, t: 0,
+      y: 0, vy: 0, heading: 0, airT: 0, comp: 0, tuck: 0, plant: null, lastSteer: 0, skid: 0,
       state: "intro", flowers: 0, toes: 0, treesHit: 0, yardSales: 0, sledHits: 0, dunks: 0, notes: 0, charm: false,
       objs: [], flakes: [], floaters: [], flags: {}, invuln: 0, white: 0, tumbleT: 0, gear: [],
       zoom: 1, shrinkT: 0, smallPending: false, nextToe: 14, nextBeep: 6,
       chad: null, ava: null, storm: 1, gp: null, fx: [], zoneDeep: false,
     };
+    s.x = cx(0); s.y = ground(s.x, 0);
     for (let i = 0; i < 140; i++) s.flakes.push({ x: Math.random() * 460 - 20, y: Math.random() * 900, r: rand(1, 3.2), v: rand(60, 160) });
     Confetti.bits = [];
     populate();
@@ -86,44 +120,50 @@ const WolfCreekLevel = (() => {
     const add = (o) => s.objs.push(o);
     const clearOf = (z, pad) => !MEMS.concat([CHARM, CREEK, ...CLIFFS]).some((m) => Math.abs(z - m) < pad) && !inCalm(z) && !inCalm(z + 300);
     // the car in the ditch + signs at the top
-    add({ type: "car", z: 60, x: cx(60) - HALF + 30 });
-    add({ type: "sign", z: 260, x: cx(260) + HALF - 20, text: L.passSign });
-    add({ type: "sign", z: 1400, x: cx(1400) - HALF + 20, text: L.wcSign, color: "#7b4a1f" });
-    // trees: scattered in powder, thick in the glades (always with a gap), sparse later
+    add({ type: "car", z: 60, x: cx(60) - 130 });
+    add({ type: "sign", z: 260, x: cx(260) + 170, text: L.passSign });
+    add({ type: "sign", z: 1400, x: cx(1400) - 190, text: L.wcSign, color: "#7b4a1f" });
+    const across = (z, k) => cx(z) + (hash(z, k) - 0.5) * (HALF * 2 - 80);
+    const nearCliff = (z, pad) => CLIFFS.some((c) => z > c - pad && z < c + 60);
+    // trees: scattered everywhere, thick in the glades (with gaps that wander), sparse late
     for (let z = 900; z < FINISH - 1500; z += 90) {
-      if (!clearOf(z, 260)) continue;
-      const glade = within(z, GLADES);
-      const l = cx(z) - HALF, r = cx(z) + HALF;
-      if (glade) {
-        const gap = cx(z) + Math.sin(z / 900) * (HALF - 90);
-        for (let x = l + 20; x < r - 10; x += 44 + hash(z, 3) * 26) {
-          if (Math.abs(x - gap) < 85) continue;
+      if (!clearOf(z, 260) || nearCliff(z, 140)) continue;
+      if (within(z, GLADES)) {
+        const gaps = [cx(z) + Math.sin(z / 900) * 300, cx(z) - 260 + Math.sin(z / 650 + 1) * 200];
+        for (let x = cx(z) - HALF + 20; x < cx(z) + HALF - 10; x += 46 + hash(z, 3) * 26) {
+          if (gaps.some((g) => Math.abs(x - g) < 85)) continue;
           if (hash(x, z) < 0.3) add({ type: "tree", z: z + hash(x, 1) * 40, x, sz: 0.85 + hash(x, z + 1) * 0.5 });
         }
-      } else if (!onIce(z) && hash(z, 4) < (z > CHAD_FINALE ? 0.12 : 0.22)) {
-        add({ type: "tree", z, x: l + 30 + hash(z, 5) * (r - l - 60), sz: 0.8 + hash(z, 6) * 0.5 });
+      } else if (!onIce(z)) {
+        const n = z > CHAD_FINALE ? 1 : 3;
+        for (let k = 0; k < n; k++) if (hash(z, 4 + k) < 0.45) add({ type: "tree", z: z + hash(z, k) * 60, x: across(z, 20 + k), sz: 0.8 + hash(z, 6 + k) * 0.6 });
       }
     }
-    // rocks: mostly on the ice and in the cliff landings
-    for (let z = 2000; z < FINISH - 1500; z += 140) {
+    // rocks: everywhere a little, lots on the ice and below the cliffs
+    for (let z = 2000; z < FINISH - 1500; z += 120) {
       if (!clearOf(z, 220)) continue;
-      const p = onIce(z) ? 0.6 : within(z, PILLOWS) ? 0.28 : 0.07;
-      if (hash(z, 7) < p) add({ type: "rock", z, x: cx(z) + (hash(z, 8) - 0.5) * (HALF * 2 - 60), r: 18 + hash(z, 9) * 12 });
+      const below = CLIFFS.some((c) => z > c + 150 && z < c + 900);
+      const p = onIce(z) ? 0.5 : below ? 0.5 : 0.2;
+      for (let k = 0; k < 3; k++) if (hash(z, 7 + k * 3) < p) add({ type: "rock", z: z + k * 30, x: across(z, 30 + k), r: 18 + hash(z, 9 + k) * 14 });
     }
     // pillows (small jumps) with flowers floating over them
-    for (let z = PILLOWS[0] + 200; z < PILLOWS[1]; z += 520) {
+    for (let z = PILLOWS[0] + 200; z < PILLOWS[1]; z += 420) {
       if (CLIFFS.some((c) => Math.abs(z - c) < 350)) continue;
-      const x = cx(z) + (hash(z, 10) - 0.5) * (HALF * 1.4);
-      add({ type: "pillow", z, x });
-      add({ type: "flower", z: z + 110, x, h: 45, hue: Math.floor(z / 7) % 3 });
+      for (let k = 0; k < 2; k++) {
+        const x = across(z, 10 + k);
+        add({ type: "pillow", z, x });
+        add({ type: "flower", z: z + 110, x, h: 45, hue: (Math.floor(z / 7) + k) % 3 });
+      }
     }
-    for (const z of [3000, 5200, 7600]) { const x = cx(z) + (hash(z, 2) - 0.5) * 200; add({ type: "pillow", z, x }); add({ type: "flower", z: z + 110, x, h: 45, hue: 1 }); }
+    for (const z of [3000, 5200, 7600]) { const x = cx(z) + (hash(z, 2) - 0.5) * 300; add({ type: "pillow", z, x }); add({ type: "flower", z: z + 110, x, h: 45, hue: 1 }); }
     CLIFFS.forEach((z) => add({ type: "cliff", z }));
-    add({ type: "creek", z: CREEK, bridges: [cx(CREEK) - 140, cx(CREEK) + 120] });
-    // chrysanthemums in little lines along the run
-    for (let z = 1200; z < FINISH - 1500; z += 700 + Math.floor(hash(z, 11) * 300)) {
+    const bridges = [];
+    for (let x = cx(CREEK) - HALF + 60; x < cx(CREEK) + HALF; x += 290) bridges.push(x);
+    add({ type: "creek", z: CREEK, bridges });
+    // chrysanthemums in little lines all over
+    for (let z = 1200; z < FINISH - 1500; z += 520 + Math.floor(hash(z, 11) * 260)) {
       if (!clearOf(z, 200)) continue;
-      const x = cx(z) + (hash(z, 12) - 0.5) * (HALF * 1.3);
+      const x = cx(z) + (hash(z, 12) - 0.5) * (HALF * 1.4);
       for (let i = 0; i < 3; i++) add({ type: "flower", z: z + i * 60, x: x + Math.sin(i) * 12, h: 0, hue: (Math.floor(z / 10) + i) % 3 });
     }
     SNICKERS.forEach((z, i) => add({ type: "snickers", z, x: cx(z) + [-80, 70, 0, 90, -60, 40, -90, 30][i] }));
@@ -132,8 +172,8 @@ const WolfCreekLevel = (() => {
     for (let z = SLEDS[0] + 300; z < SLEDS[1]; z += 1100) add({ type: "sled", z, x: 0, dir: hash(z, 13) < 0.5 ? 1 : -1, go: false, yell: pick(L.sledYell) });
     add({ type: "charm", z: CHARM, x: cx(CHARM) });
     add({ type: "road", z: FINISH });
-    add({ type: "sign", z: FINISH - 120, x: cx(FINISH) + HALF - 10, text: L.roadSign, color: "#2d6a4f" });
-    add({ type: "ditchSled", z: FINISH + 40, x: cx(FINISH) - HALF + 40 });
+    add({ type: "sign", z: FINISH - 120, x: cx(FINISH) + 220, text: L.roadSign, color: "#2d6a4f" });
+    add({ type: "ditchSled", z: FINISH + 40, x: cx(FINISH) - 200 });
     // keep obstacles off the notes, charm and bridges
     const bad = (o) => (o.type === "tree" || o.type === "rock") &&
       ([...MEMS, CHARM].some((m) => Math.abs(o.z - m) < 200) || (Math.abs(o.z - CREEK) < 160));
@@ -166,31 +206,7 @@ const WolfCreekLevel = (() => {
     s.gear = s.gear.filter((g) => g.t < 1.6);
 
     const prevZ = s.z;
-    if (s.state === "ski" || s.state === "tumble" || s.state === "arrive") {
-      // speed
-      let target = targetSpeed(s.z) + s.boost;
-      if (s.state === "tumble") target = 40;
-      if (s.state === "arrive") target = Math.max(0, (FINISH - 70 - s.z) * 0.6);
-      s.v += (target - s.v) * Math.min(1, dt * (s.state === "tumble" ? 4 : 1.4));
-      if (s.boostT > 0) { s.boostT -= dt; if (s.boostT <= 0) { s.boost = 0; Engine.toast(pick(LINES.doesntLastLong)); } }
-      s.z += s.v * dt;
-      // carving
-      const steer = s.state === "ski" ? Engine.steer() : 0;
-      const grip = onIce(s.z) ? 0.28 : s.air ? 0.45 : 1;
-      s.vx += steer * 1500 * grip * dt;
-      s.vx *= 1 - (onIce(s.z) ? 0.5 : 3.2) * dt;
-      s.vx = clamp(s.vx, -300, 300);
-      s.x += s.vx * dt;
-      s.lean += (clamp(s.vx / 300, -1, 1) * 0.45 - s.lean) * Math.min(1, dt * 8);
-      // edges of the run are deep, slow snow
-      const off = s.x - cx(s.z);
-      if (Math.abs(off) > HALF - SKIER_R) { s.x = cx(s.z) + Math.sign(off) * (HALF - SKIER_R); s.vx *= -0.3; s.v *= 1 - dt * 2; }
-      // air
-      if (s.air) {
-        s.vh -= 900 * dt; s.h += s.vh * dt;
-        if (s.h <= 0) { s.h = 0; s.air = false; land(); }
-      }
-    }
+    if (s.state === "ski" || s.state === "tumble" || s.state === "arrive") physics(dt);
     s.camX += (s.x - s.camX) * Math.min(1, dt * 4);
     s.zoneDeep = within(s.z, POWDER);
     if (s.state === "tumble") { s.tumbleT -= dt; if (s.tumbleT <= 0) { s.state = "ski"; s.invuln = 1.2; } }
@@ -209,6 +225,66 @@ const WolfCreekLevel = (() => {
       if (f.y > Engine.H + 10 || f.x < -30 || f.x > Engine.W + 30) { f.y = rand(-40, Engine.H * 0.6); f.x = rand(-20, Engine.W + 20); }
     }
     updateHud();
+  }
+
+  // ---------- Ski physics ----------
+  // Gravity pulls her down the terrain. She points her skis (heading) with left/right; the snow
+  // grips sideways, so carving sheds speed. If the ground drops away faster than she falls
+  // (rollers, cliffs), she leaves it and flies until she lands.
+  function physics(dt) {
+    const steer = s.state === "ski" ? Engine.steer() : 0;
+    const ice = onIce(s.z);
+    // pole plant on the inside when a turn starts
+    if (steer && steer !== s.lastSteer && !s.air) s.plant = { side: steer, t: 0.4 };
+    s.lastSteer = steer;
+    if (s.plant) { s.plant.t -= dt; if (s.plant.t <= 0) s.plant = null; }
+    const turnRate = s.air ? 3.2 : ice ? 1.3 : 2.5;
+    const prevHeading = s.heading;
+    if (steer) s.heading += steer * turnRate * dt;
+    else if (!s.air) s.heading -= s.heading * Math.min(1, 1.4 * dt); // settles back to the fall line
+    s.heading = clamp(s.heading, -1.35, 1.35);
+    const sn = Math.sin(s.heading), cs = Math.cos(s.heading);
+    let u = s.vx * sn + s.v * cs;      // speed along the skis
+    let w = s.vx * cs - s.v * sn;      // sideways slip
+    if (!s.air) {
+      const ax = -G * gradX(s.x, s.z), az = -G * gradZ(s.x, s.z);
+      const drag = DRAG * (s.zoneDeep ? 1.25 : 1) * (ice ? 0.85 : 1);
+      u += (ax * sn + az * cs - drag * u * Math.abs(u)) * dt;
+      if (s.boostT > 0) u += 260 * dt;
+      if (u < 90 && s.state === "ski") u += 140 * dt;            // skate when it's flat
+      w += (ax * cs - az * sn) * 0.25 * dt;                      // a little sidehill slip
+      w *= Math.exp(-(ice ? 1.6 : 7) * dt);                       // edges grip (less on ice)
+      if (s.state === "tumble") { u *= 1 - 3 * dt; w *= 1 - 3 * dt; }
+      if (s.state === "arrive") { u *= 1 - 2.2 * dt; w *= 1 - 4 * dt; if (s.z > FINISH - 80) u = Math.min(u, 10); }
+      s.vx = u * sn + w * cs; s.v = u * cs - w * sn;
+    }
+    if (s.boostT > 0) { s.boostT -= dt; if (s.boostT <= 0) Engine.toast(pick(LINES.doesntLastLong)); }
+    s.v = Math.max(s.v, s.state === "arrive" ? 0 : 25);           // never back uphill
+    s.skid = w;
+    s.x += s.vx * dt; s.z += s.v * dt;
+    // walls of deep snow way out at the sides
+    const off = s.x - cx(s.z);
+    if (Math.abs(off) > HALF + 160) { s.x = cx(s.z) + Math.sign(off) * (HALF + 160); s.vx *= -0.2; }
+    // vertical: stick to the snow, or fly
+    const gNew = ground(s.x, s.z);
+    if (!s.air) {
+      const gv = (gNew - s.y) / dt;
+      if (s.state === "ski" && gv < s.vy - G * dt * 1.6 - 14) {   // the ground fell away
+        s.air = true; s.airT = 0; s.bigAir = false;
+        s.vy -= G * dt; s.y += s.vy * dt;
+      } else { s.vy = gv; s.y = gNew; }
+    } else {
+      s.airT += dt;
+      s.vy -= G * dt; s.y += s.vy * dt;
+      if (s.airT > 0.55) s.bigAir = true;
+      if (s.y <= gNew) { s.y = gNew; s.air = false; s.vy = 0; land(); }
+    }
+    s.h = Math.max(0, s.y - gNew);
+    // the body: lean into turns, tuck when it's straight and fast, absorb landings
+    const turning = (s.heading - prevHeading) / Math.max(dt, 1e-3);
+    s.lean += (clamp(turning * Math.max(u, 60) / 700, -1, 1) * 0.55 - s.lean) * Math.min(1, dt * 7);
+    s.tuck += ((!steer && !s.air && u > 300 ? 1 : 0) - s.tuck) * Math.min(1, dt * 3);
+    s.comp = Math.max(0, s.comp - dt * 2.5);
   }
 
   function events(dt) {
@@ -266,9 +342,7 @@ const WolfCreekLevel = (() => {
         case "pillow":
           if (hitZ && dx < 46 && !s.air) launch(330, false);
           break;
-        case "cliff":
-          if (hitZ && !s.air && !o.got) { o.got = true; launch(470, true); }
-          break;
+
         case "creek":
           if (hitZ && !o.got && !s.air) {
             o.got = true;
@@ -298,15 +372,20 @@ const WolfCreekLevel = (() => {
     }
   }
 
-  function launch(vh, big) {
-    s.air = true; s.vh = vh; s.h = 1; s.bigAir = big;
+  function launch(vh) {
+    if (s.air) return;
+    s.air = true; s.airT = 0; s.bigAir = false; s.vy = Math.max(s.vy, 0) + vh;
     Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700);
-    if (big) Engine.toast(L.cliff, "bad");
   }
 
   function land() {
+    if (s.airT < 0.12) return; // just a little hop
     Sfx.noise(0.18, 0.2, true);
+    s.comp = Math.min(1, 0.3 + s.airT);
     s.fx.push({ n: s.bigAir ? 40 : 18, spread: 120, up: 90 });
+    // landed sideways?
+    const dir = Math.atan2(s.vx, s.v);
+    if (s.airT > 0.35 && Math.abs(dir - s.heading) > 1.1) { yardSale(); return; }
     // landing on a rock = yard sale
     const rock = s.objs.find((o) => o.type === "rock" && !o.got && Math.abs(o.z - s.z) < 40 && Math.abs(o.x - s.x) < o.r + SKIER_R);
     if (rock) { rock.got = true; yardSale(); return; }
@@ -332,7 +411,7 @@ const WolfCreekLevel = (() => {
   function yardSale(quiet) {
     if (s.invuln > 0 || s.state !== "ski") return;
     s.state = "tumble"; s.tumbleT = quiet ? 1.0 : 1.6; s.yardSales++;
-    s.air = false; s.h = 0;
+    s.air = false; s.h = 0; s.y = ground(s.x, s.z); s.vy = 0; s.heading *= 0.3;
     ToePrompt.cancel();
     Sfx.crash(); Engine.shake = 7;
     loseFlower();
@@ -396,10 +475,10 @@ const WolfCreekLevel = (() => {
       if (o.type !== "sled" || o.got) continue;
       const ahead = o.z - s.z;
       if (!o.go && ahead < 1500 && s.state === "ski") {
-        o.go = true; o.x = cx(o.z) - o.dir * (HALF + 80);
+        o.go = true; o.x = s.x - o.dir * 560;
         // aim to cross right where she'll be when she gets there
         const tArrive = ahead / Math.max(150, s.v);
-        o.vx = o.dir * (HALF + 80 + o.dir * (s.x - cx(o.z)) * 0.6) / Math.max(1.2, tArrive) * 1.15;
+        o.vx = o.dir * 560 / Math.max(1.2, tArrive) * 1.1;
         Sfx.tone(90, 0.8, "sawtooth", 0.04, 0, 140);
       }
       if (o.go) { o.x += o.vx * dt; o.z -= 60 * dt; }
@@ -858,7 +937,7 @@ const WolfCreekLevel = (() => {
       use3D = false;
       try {
         if (typeof THREE !== "undefined" && Ski3D.init($("stage"))) {
-          Ski3D.build({ s, ground, cx, HALF, onIce, edge: edgeScenery(), GRANDPARENTS });
+          Ski3D.build({ s, ground, cx, HALF, onIce, pitch, chutes: CHUTES, edge: edgeScenery(), GRANDPARENTS });
           Ski3D.show(true); use3D = true;
         }
       } catch (e) { console.error(e); use3D = false; Ski3D.show(false); }
@@ -875,6 +954,7 @@ const WolfCreekLevel = (() => {
     _debug: () => s, // used by the test script
     _cx: (z) => cx(z),
     _3d: () => use3D,
+    _ground: (x, z) => ground(x, z),
     stop() { Ski3D.show(false); if (s.closeMemory) s.closeMemory(); ToePrompt.cancel(); s.state = "done"; s.dead = true; Engine.closeDialog(); Engine.hideBanner(); Confetti.bits = []; },
   };
 })();
