@@ -14,7 +14,7 @@ const WolfCreekLevel = (() => {
   const GULLY = [19400, 22000];
   const CLIFFS = [22400, 25000], ICE = [26600, 32000], SLEDS = [34800, 41000];
   const MEMS = [18300, 33300, 42600];
-  const CALM = MEMS.map((m) => [m - 1700, m + 500]); // empty, slow open bowls before each note
+  const CALM = MEMS.map((m) => [m - 300, m + 150]);  // just a little clear space around each note
   const CHADS = [35600, 38900];
   const GRANDPARENTS = 37800;
   const CHAD_FINALE = 44000, AVA_START = 44500, AVA_END = 48600;
@@ -58,8 +58,6 @@ const WolfCreekLevel = (() => {
     if (within(z, POWDER)) p = 0.19;
     else if (onIce(z)) p = 0.26;
     else if (z > CHAD_FINALE) p = 0.24;
-    const c = calmAmount(z);
-    p = p * (1 - c) + 0.07 * c;
     if (z > FINISH - 1800) p = Math.max(0.02, p * clamp((FINISH - z) / 1800, 0, 1));
     return p;
   }
@@ -123,7 +121,7 @@ const WolfCreekLevel = (() => {
       const dz = z - (CREEK - 55);
       if (dz > -70 && dz < 12) creek += (1 - br) * (dz <= 0 ? 24 * Math.pow((dz + 70) / 70, 1.6) : 24 * (1 - dz / 12));
     }
-    const calm = (1 - 0.6 * calmAmount(z)) * (1 - 0.75 * gf);
+    const calm = 1 - 0.75 * gf;
     return base(z) + (roll + ridge + roller) * calm + cliff + gully + kick + pil + creek + out * 0.35 + out * out * 0.0014 + dune;
   }
   const gradX = (x, z) => (ground(x + 3, z) - ground(x - 3, z)) / 6;
@@ -288,11 +286,11 @@ const WolfCreekLevel = (() => {
     s.lastSteer = steer;
     if (s.plant) { s.plant.t -= dt; if (s.plant.t <= 0) s.plant = null; }
     // in the air left/right spins her (slowly at first, so little hops don't spin you out)
-    const turnRate = s.air ? (s.airT < 0.12 ? 2.5 : 10) : ice ? 1.3 : 2.5;
+    const turnRate = s.air ? (s.airT < 0.28 ? 2.5 : 10) : ice ? 1.3 : 2.5;
     const prevHeading = s.heading;
     if (steer) { s.heading += steer * turnRate * dt; if (s.air) s.spinAcc += steer * turnRate * dt; }
     else if (!s.air) s.heading -= s.heading * Math.min(1, 1.4 * dt); // settles back to the fall line
-    else if (s.airT > 0.12) {
+    else if (s.airT > 0.28) {
       // let go mid-air and she rotates to the nearest clean landing (finishing a spin if she's past halfway)
       const dir = Math.atan2(s.vx, s.v), k = Math.round((s.heading - dir) / (Math.PI * 2));
       const want = dir + k * Math.PI * 2, step = clamp(want - s.heading, -8 * dt, 8 * dt);
@@ -308,7 +306,8 @@ const WolfCreekLevel = (() => {
       const ah = ax * sn + az * cs;
       u += ((ah < 0 ? ah * 0.3 : ah) - drag * u * Math.abs(u)) * dt;   // going uphill (ramps, walls) barely slows her
       if (s.boostT > 0) u += 260 * dt;
-      if (u < 90 && s.state === "ski") u += 140 * dt;            // skate when it's flat
+      // always fast, and only ever faster: a floor that rises down the mountain
+      if (s.state !== "arrive") u = clamp(u, minSpeed(s.z), minSpeed(s.z) + 170);
       w += (ax * cs - az * sn) * 0.25 * dt;                      // a little sidehill slip
       w *= Math.exp(-(ice ? 1.6 : 7) * dt);                       // edges grip (less on ice)
       if (s.state === "tumble") { u *= 1 - 0.25 * dt; w *= 1 - 3 * dt; }   // she rolls, keeps her speed
@@ -330,7 +329,7 @@ const WolfCreekLevel = (() => {
         s.air = true; s.airT = 0; s.bigAir = false; s.spinAcc = 0;
         const offCliff = CLIFFS.some((c) => s.z > c - 10 && s.z < c + 40) && Math.min(...CHUTES(s.z).map((q) => Math.abs(s.x - q))) > 90;
         if (offCliff) { s.vy += 120; Engine.toast(pick(L.cliffSend), "good"); Sfx.tone(250, 0.4, "triangle", 0.09, 0, 800); }
-        if (KICKERS.some((k) => Math.abs(s.z - k.z) < 50 && Math.abs(s.x - k.x) < k.w / 2 + 20)) { s.vy += 150; Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700); } // pop off the lip
+        if (KICKERS.some((k) => Math.abs(s.z - k.z) < 50 && Math.abs(s.x - k.x) < k.w / 2 + 20)) { s.vy += 80; Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700); } // pop off the lip
         s.vy -= G_AIR * dt; s.y += s.vy * dt;
       } else { s.vy = gv; s.y = gNew; }
     } else {
@@ -346,6 +345,8 @@ const WolfCreekLevel = (() => {
     s.tuck += ((!steer && !s.air && u > 300 ? 1 : 0) - s.tuck) * Math.min(1, dt * 3);
     s.comp = Math.max(0, s.comp - dt * 2.5);
   }
+
+  function minSpeed(z) { return 350 + 110 * clamp(z / FINISH, 0, 1); }
 
   function events(dt) {
     const z = s.z;
@@ -409,7 +410,7 @@ const WolfCreekLevel = (() => {
           }
           break;
         case "flower":
-          if (Math.abs(o.z - s.z) < 24 && dx < 34 && Math.abs(s.h - o.h) < 45) { o.got = true; s.flowers++; Sfx.flower(); }
+          if (Math.abs(o.z - s.z) < 26 && dx < (o.h ? 46 : 34) && (o.h ? s.air && s.h > 30 : s.h < 45)) { o.got = true; s.flowers++; Sfx.flower(); }
           break;
         case "snickers":
           if (Math.abs(o.z - s.z) < 24 && dx < 34) {
@@ -441,7 +442,7 @@ const WolfCreekLevel = (() => {
     // landing on a downslope turns the fall into speed (like real skiing)
     if (vyi < 0) {
       const d = Math.atan2(s.vx, s.v), gAlong = gradX(s.x, s.z) * Math.sin(d) + gradZ(s.x, s.z) * Math.cos(d);
-      const gain = Math.min(220, -vyi * Math.max(0, -gAlong) * 0.9), sp = Math.hypot(s.vx, s.v) || 1;
+      const gain = Math.min(120, -vyi * Math.max(0, -gAlong) * 0.6), sp = Math.hypot(s.vx, s.v) || 1;
       s.vx += s.vx / sp * gain; s.v += s.v / sp * gain;
     }
     if (s.airT < 0.12) return; // just a little hop
@@ -453,7 +454,7 @@ const WolfCreekLevel = (() => {
     let diff = s.heading - dir;
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     s.heading = dir + diff;
-    if (s.airT > 0.3 && Math.abs(diff) > 1.1) { s.heading = dir; yardSale(); Engine.toast(L.sideways, "bad"); return; }
+    if (s.airT > 0.45 && Math.abs(diff) > 1.1) { s.heading = dir; yardSale(); Engine.toast(L.sideways, "bad"); return; }
     const spins = Math.floor((Math.abs(s.spinAcc) + 0.7) / (Math.PI * 2));
     if (spins > 0) {
       s.spins += spins; s.flowers += 2 * spins;
