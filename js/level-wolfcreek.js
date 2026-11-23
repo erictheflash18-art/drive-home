@@ -31,6 +31,29 @@ const WolfCreekLevel = (() => {
 
   // the run winds gently
   function cx(z) { return 140 * Math.sin(z / 2100) + 50 * Math.sin(z / 730 + 2); }
+  // 3D height of the snow: downhill, soft rolls on the run, big powder dunes off to the sides
+  function ground(x, z) {
+    const out = Math.max(0, Math.abs(x - cx(z)) - (HALF - 40));
+    const roll = 11 * Math.sin(x / 120 + z / 420) + 6 * Math.sin(x / 53 - z / 210) + 4 * Math.sin(z / 150);
+    const dune = Math.min(1, out / 140) * (40 * Math.pow(Math.sin(x / 150 + z / 330), 2) + 22 * Math.sin(x / 61 + z / 170));
+    return -0.2 * z + roll * (1 - Math.min(1, out / 80) * 0.5) + out * 0.32 + out * out * 0.0012 + dune;
+  }
+  // trees and boulders off the run (3D view only)
+  function edgeScenery() {
+    const e = [];
+    for (let z = -300; z < FINISH + 3000; z += 70) {
+      for (const side of [-1, 1]) {
+        for (let k = 0; k < 3; k++) {
+          const h = hash(z + k * 17, side + 3);
+          if (h > 0.62 - k * 0.12) continue;
+          const off = HALF + 25 + k * 120 + hash(z, side * 7 + k) * 110;
+          e.push({ type: "tree", z: z + hash(z, k) * 50, x: cx(z) + side * off, sz: 0.9 + hash(z, k + 9) * 0.7 });
+        }
+        if (hash(z, side + 21) < 0.06) e.push({ type: "boulder", z, x: cx(z) + side * (HALF + 60 + hash(z, 5) * 260), r: 40 + hash(z, 8) * 70 });
+      }
+    }
+    return e;
+  }
 
   function targetSpeed(z) {
     let v = 330;
@@ -51,7 +74,7 @@ const WolfCreekLevel = (() => {
       state: "intro", flowers: 0, toes: 0, treesHit: 0, yardSales: 0, sledHits: 0, dunks: 0, notes: 0, charm: false,
       objs: [], flakes: [], floaters: [], flags: {}, invuln: 0, white: 0, tumbleT: 0, gear: [],
       zoom: 1, shrinkT: 0, smallPending: false, nextToe: 14, nextBeep: 6,
-      chad: null, ava: null, storm: 1, gp: null,
+      chad: null, ava: null, storm: 1, gp: null, fx: [], zoneDeep: false,
     };
     for (let i = 0; i < 140; i++) s.flakes.push({ x: Math.random() * 460 - 20, y: Math.random() * 900, r: rand(1, 3.2), v: rand(60, 160) });
     Confetti.bits = [];
@@ -169,6 +192,7 @@ const WolfCreekLevel = (() => {
       }
     }
     s.camX += (s.x - s.camX) * Math.min(1, dt * 4);
+    s.zoneDeep = within(s.z, POWDER);
     if (s.state === "tumble") { s.tumbleT -= dt; if (s.tumbleT <= 0) { s.state = "ski"; s.invuln = 1.2; } }
     if (s.state === "ski") { events(dt); collide(prevZ); }
     updateNotes(dt);
@@ -282,6 +306,7 @@ const WolfCreekLevel = (() => {
 
   function land() {
     Sfx.noise(0.18, 0.2, true);
+    s.fx.push({ n: s.bigAir ? 40 : 18, spread: 120, up: 90 });
     // landing on a rock = yard sale
     const rock = s.objs.find((o) => o.type === "rock" && !o.got && Math.abs(o.z - s.z) < 40 && Math.abs(o.x - s.x) < o.r + SKIER_R);
     if (rock) { rock.got = true; yardSale(); return; }
@@ -290,13 +315,14 @@ const WolfCreekLevel = (() => {
   }
 
   function loseFlower() {
-    if (s.flowers > 0) { s.flowers--; s.floaters.push({ x: Engine.W / 2, y: GY() - 70, text: "-1 🌼", t: 0 }); }
+    if (s.flowers > 0) { s.flowers--; const sc = skScr(); s.floaters.push({ x: sc.x, y: sc.y - 50, text: "-1 🌼", t: 0 }); }
   }
 
   function hitTree() {
     if (s.invuln > 0) return;
     s.invuln = 1; s.treesHit++;
     s.white = 1; s.v *= 0.35; s.vx *= -0.5;
+    s.fx.push({ n: 50, spread: 140, up: 140 });
     Sfx.crash(); Sfx.noise(0.6, 0.3, true); Engine.shake = 6;
     loseFlower();
     Engine.toast(pick(L.treeHit), "bad");
@@ -310,7 +336,8 @@ const WolfCreekLevel = (() => {
     ToePrompt.cancel();
     Sfx.crash(); Engine.shake = 7;
     loseFlower();
-    const gx = Engine.W / 2 + (s.x - s.camX), gy = GY() - 30;
+    const sc = skScr(), gx = sc.x, gy = sc.y;
+    s.fx.push({ n: 45, spread: 160, up: 120 });
     for (const kind of ["ski", "ski", "pole", "pole", "hat"]) s.gear.push({ kind, x: gx, y: gy, vx: rand(-220, 220), vy: rand(-420, -220), r: 0, vr: rand(-12, 12), t: 0 });
     if (!quiet) Engine.toast(pick(L.yardSale), "bad");
     if (s.ava && !s.ava.done) s.ava.gap -= 90;
@@ -496,7 +523,21 @@ const WolfCreekLevel = (() => {
   }
 
   // ---------- Drawing ----------
+  let use3D = false;
+  function skScr() {
+    if (use3D) return Ski3D.skierScreen(s, Engine.W, Engine.H);
+    return { x: Engine.W / 2 + (s.x - s.camX), y: GY() - 30 };
+  }
+
   function draw(ctx) {
+    if (!use3D) return draw2D(ctx);
+    try { Ski3D.render(s, Engine.W, Engine.H, Engine.scale, Engine.dpr); }
+    catch (e) { console.error(e); use3D = false; Ski3D.show(false); return draw2D(ctx); }
+    ctx.clearRect(0, 0, Engine.W, Engine.H);
+    overlays(ctx);
+  }
+
+  function draw2D(ctx) {
     const W = Engine.W, H = Engine.H, hy = HY(), gy = GY();
     ctx.save();
     if (Engine.shake) ctx.translate(rand(-1, 1) * Engine.shake, rand(-1, 1) * Engine.shake);
@@ -550,7 +591,11 @@ const WolfCreekLevel = (() => {
     ctx.fillStyle = "rgba(255,255,255,.85)";
     for (const f of s.flakes) { if (Math.random() > 0.15 + 0.85 * st) continue; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
+    overlays(ctx);
+  }
 
+  function overlays(ctx) {
+    const W = Engine.W, H = Engine.H;
     // the avalanche, roaring up from behind
     if (s.ava && s.ava.gap < 620) drawAva(ctx);
     // gear flying (yard sale)
@@ -771,7 +816,7 @@ const WolfCreekLevel = (() => {
   function drawAva(ctx) {
     const W = Engine.W, H = Engine.H, a = s.ava;
     const close = clamp(1 - (a.gap - 45) / 560, 0, 1);
-    const topY = H + 30 - (H + 30 - (GY() + 20)) * close;
+    const topY = H + 30 - (H + 30 - (skScr().y + 50)) * close;
     ctx.fillStyle = "rgba(235,242,250,.96)";
     ctx.fillRect(0, topY + 20, W, H - topY);
     for (let i = 0; i < 9; i++) {
@@ -810,6 +855,13 @@ const WolfCreekLevel = (() => {
       reset();
       const me = s;
       Engine.setControls("◀ CARVE", "CARVE ▶");
+      use3D = false;
+      try {
+        if (typeof THREE !== "undefined" && Ski3D.init($("stage"))) {
+          Ski3D.build({ s, ground, cx, HALF, onIce, edge: edgeScenery(), GRANDPARENTS });
+          Ski3D.show(true); use3D = true;
+        }
+      } catch (e) { console.error(e); use3D = false; Ski3D.show(false); }
       await Engine.say(L.intro);
       if (me.dead) return;
       // click in first
@@ -822,6 +874,7 @@ const WolfCreekLevel = (() => {
     update, draw,
     _debug: () => s, // used by the test script
     _cx: (z) => cx(z),
-    stop() { if (s.closeMemory) s.closeMemory(); ToePrompt.cancel(); s.state = "done"; s.dead = true; Engine.closeDialog(); Engine.hideBanner(); Confetti.bits = []; },
+    _3d: () => use3D,
+    stop() { Ski3D.show(false); if (s.closeMemory) s.closeMemory(); ToePrompt.cancel(); s.state = "done"; s.dead = true; Engine.closeDialog(); Engine.hideBanner(); Confetti.bits = []; },
   };
 })();
