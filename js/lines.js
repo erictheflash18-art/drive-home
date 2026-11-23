@@ -319,6 +319,7 @@ const LINES = {
     gully: "The Gully. Ride the walls.",
     cliffChoice: "CLIFF. Huck it or take a ramp. Your call.",
     creekDitch: "Stuck in a ditch. Again.",
+    cliffSend: ["SEND IT.", "HUCK IT, REESE.", "Big mountain penguin."],
     sideways: "You landed sideways. That's not how skiing works.",
     spinLanded: [
       "THREE-SIXTY. Who taught you that.",

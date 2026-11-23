@@ -8,7 +8,10 @@ const Ski3D = (() => {
   let terrain, tGeo, trees, rocks, pillows, shadow, peng, spray, snow, mountains;
   let built = [], dyn = {}, texCache = {};
   let world, lastT = 0, camY = null, camLX = 0, camYaw = 0, originKey = "";
-  const NX = 64, NZ = 150, CELL_X = 26, CELL_Z = 21;
+  const NX = 72, NZ = 150;
+  // grid offsets: ~25 units apart near her, stretching to ±2900 sideways and 3800 ahead
+  const XOFF = Array.from({ length: NX + 1 }, (_, i) => { const u = i / NX * 2 - 1; return Math.sign(u) * (Math.abs(u) * 900 + Math.pow(Math.abs(u), 3) * 2000); });
+  const ZOFF = Array.from({ length: NZ + 1 }, (_, i) => { const v = i / NZ; return -560 + v * 1900 + Math.pow(v, 3) * 2460; });
   const MAX_TREES = 1500, MAX_ROCKS = 500, MAX_PILLOWS = 80;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -318,7 +321,7 @@ const Ski3D = (() => {
     tGeo = new THREE.PlaneGeometry(1, 1, NX, NZ);
     tGeo.rotateX(-Math.PI / 2);
     tGeo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(tGeo.attributes.position.count * 3), 3));
-    terrain = new THREE.Mesh(tGeo, new THREE.MeshPhongMaterial({ vertexColors: true, map: snowTexture(), shininess: 18, specular: new THREE.Color("#2a3440") }));
+    terrain = new THREE.Mesh(tGeo, new THREE.MeshPhongMaterial({ vertexColors: true, map: snowTexture(), shininess: 18, specular: new THREE.Color("#2a3440"), side: THREE.DoubleSide }));
     terrain.frustumCulled = false;
     scene.add(terrain);
     originKey = "";
@@ -457,8 +460,8 @@ const Ski3D = (() => {
 
   // ---------- per frame ----------
   function regenTerrain(s) {
-    const x0 = Math.floor((s.x - NX * CELL_X / 2) / (CELL_X * 4)) * CELL_X * 4;
-    const z0 = Math.floor((s.z - 480) / (CELL_Z * 4)) * CELL_Z * 4;
+    const x0 = Math.floor(s.x / 80) * 80;
+    const z0 = Math.floor(s.z / 60) * 60;
     const key = x0 + ":" + z0;
     if (key === originKey) return;
     originKey = key;
@@ -466,10 +469,10 @@ const Ski3D = (() => {
     const snowC = new THREE.Color("#ffffff"), iceC = new THREE.Color("#c4d6ea"), bermC = new THREE.Color("#f1f6fc");
     const c = new THREE.Color();
     for (let iz = 0; iz <= NZ; iz++) {
-      const z = z0 + iz * CELL_Z;
+      const z = z0 + ZOFF[iz];
       const ice = world.onIce(z), cxz = world.cx(z);
       for (let ix = 0; ix <= NX; ix++) {
-        const i = iz * (NX + 1) + ix, x = x0 + ix * CELL_X;
+        const i = iz * (NX + 1) + ix, x = x0 + XOFF[ix];
         p.setXYZ(i, x, world.ground(x, z), -z);
         uv.setXY(i, x / 160, z / 160);
         const out = Math.max(0, Math.abs(x - cxz) - world.HALF);
@@ -481,7 +484,7 @@ const Ski3D = (() => {
     const rockC = new THREE.Color("#5b6474"), rockL = new THREE.Color("#7d8696");
     for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix <= NX; ix++) {
       const i = iz * (NX + 1) + ix, j = i + NX + 1;
-      const drop = (p.getY(i) - p.getY(j)) / CELL_Z - world.pitch(z0 + iz * CELL_Z);
+      const drop = (p.getY(i) - p.getY(j)) / (ZOFF[iz + 1] - ZOFF[iz]) - world.pitch(z0 + ZOFF[iz]);
       if (drop > 0.9) { c.copy(hash2(ix + x0, iz + z0) > 0.5 ? rockC : rockL); col.setXYZ(i, c.r, c.g, c.b); col.setXYZ(j, c.r, c.g, c.b); }
     }
     p.needsUpdate = true; col.needsUpdate = true; uv.needsUpdate = true;
@@ -570,11 +573,11 @@ const Ski3D = (() => {
     const gy = world.ground(s.x, s.z);
     const sy = gy + s.h * 0.7;
     peng.position.set(s.x, sy, -s.z);
-    if (s.state === "tumble") { peng.rotation.set(Math.sin(s.t * 12) * 0.4 - 1.3, s.t * 6, 0.6); peng.position.y = gy + 4; }
+    if (s.state === "tumble") { peng.rotation.set(-s.tumbleT * 14, -s.heading, 0, "YXZ"); peng.position.y = gy + 16; pose(s, dt); }
     else {
       // skis follow the slope under them, she faces where her skis point
       const nx = (world.ground(s.x + 4, s.z) - world.ground(s.x - 4, s.z)) / 8, nz = (world.ground(s.x, s.z + 4) - world.ground(s.x, s.z - 4)) / 8;
-      const pitch = s.air ? clamp(-s.vy / 900, -0.5, 0.4) : Math.atan(nz * Math.cos(s.heading) + nx * Math.sin(s.heading));
+      const pitch = s.air ? clamp(Math.atan2(s.vy, Math.hypot(s.vx, s.v)) * 0.8, -0.7, 0.5) : Math.atan(nz * Math.cos(s.heading) + nx * Math.sin(s.heading));
       peng.rotation.set(pitch, -s.heading, 0, "YXZ");
       pose(s, dt);
     }
@@ -590,6 +593,8 @@ const Ski3D = (() => {
     camLX = cx;
     const ty = Math.max(world.ground(cx, cz), sy + 6) + up;
     camY = camY == null ? ty : camY + (ty - camY) * Math.min(1, dt * 3.5);
+    // never let the camera sink into the snow (or behind a lip between it and her)
+    camY = Math.max(camY, world.ground(cx, cz) + 30, world.ground((cx + s.x) / 2, (cz + s.z) / 2) + 26);
     const shake = Engine.shake || 0;
     camera.position.set(cx + rand(-1, 1) * shake * 0.8, camY + rand(-1, 1) * shake * 0.8, -cz);
     const lx = s.x + Math.sin(camYaw) * 330, lz = s.z + Math.cos(camYaw) * 330;
@@ -624,7 +629,7 @@ const Ski3D = (() => {
     // weather: storm → bluebird
     const st = s.storm;
     const horizon = lerpColor("#d6ebfb", "#dde4ec", st), zenith = lerpColor("#3d8fd8", "#a9b6c6", st);
-    fog.color.copy(horizon); fog.near = 260 + 260 * (1 - st); fog.far = 2100 + 1400 * (1 - st);
+    fog.color.copy(horizon); fog.near = 260 + 260 * (1 - st); fog.far = 2300 + 1300 * (1 - st);
     const sc = sky.geometry.attributes.color, sp = sky.geometry.attributes.position;
     for (let i = 0; i < sc.count; i++) { const t = clamp(sp.getY(i) / 3500, 0, 1); const cc = horizon.clone().lerp(zenith, Math.pow(t, 0.6)); sc.setXYZ(i, cc.r, cc.g, cc.b); }
     sc.needsUpdate = true;

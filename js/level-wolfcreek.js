@@ -103,10 +103,10 @@ const WolfCreekLevel = (() => {
     let kick = 0;
     for (const k of KICKERS) {
       const dz = z - k.z;
-      if (dz < -k.len || dz > 14) continue;
-      const lat = smooth(k.w / 2 + 30, k.w / 2, Math.abs(x - k.x));
+      if (dz < -k.len || dz > 70) continue;
+      const lat = smooth(k.w / 2 + 55, k.w / 2 - 10, Math.abs(x - k.x));
       if (lat <= 0) continue;
-      kick += lat * (dz <= 0 ? k.h * Math.pow((dz + k.len) / k.len, 1.6) : k.h * (1 - dz / 14));
+      kick += lat * (dz <= 0 ? k.h * Math.pow((dz + k.len) / k.len, 1.6) : k.h * (1 - smooth(0, 70, dz)));
     }
     // pillows
     let pil = 0;
@@ -189,7 +189,7 @@ const WolfCreekLevel = (() => {
     for (let z = 2000; z < FINISH - 1500; z += 120) {
       if (!clearOf(z, 220)) continue;
       const below = CLIFFS.some((c) => z > c + 150 && z < c + 900);
-      const p = onIce(z) ? 0.5 : below ? 0.5 : 0.2;
+      const p = onIce(z) ? 0.5 : below ? 0.3 : 0.2;
       for (let k = 0; k < 3; k++) if (hash(z, 7 + k * 3) < p) add({ type: "rock", z: z + k * 30, x: across(z, 30 + k), r: 18 + hash(z, 9 + k) * 14 });
     }
     // pillows (part of the terrain) with flowers floating over some of them
@@ -197,7 +197,7 @@ const WolfCreekLevel = (() => {
     // kickers: flowers hang in the air past the lip (you only get them if you send it)
     KICKERS.forEach((k, i) => {
       add({ type: "kicker", z: k.z, x: k.x, w: k.w });
-      if (k.z !== 46800) for (let j = 0; j < 3; j++) add({ type: "flower", z: k.z + 90 + j * 90, x: k.x, h: [75, 105, 115][j], hue: (i + j) % 3 });
+      if (k.z !== 46800) for (let j = 0; j < 3; j++) add({ type: "flower", z: k.z + 110 + j * 120, x: k.x, h: [95, 140, 150][j], hue: (i + j) % 3 });
     });
     // the Gully: flowers up on the walls
     for (let z = GULLY[0] + 500; z < GULLY[1] - 400; z += 260) {
@@ -305,12 +305,13 @@ const WolfCreekLevel = (() => {
     if (!s.air || s.h < 8) {          // tiny hops still carve
       const ax = -G * gradX(s.x, s.z), az = -G * gradZ(s.x, s.z);
       const drag = DRAG * (s.zoneDeep ? 1.25 : 1) * (ice ? 0.85 : 1);
-      u += (ax * sn + az * cs - drag * u * Math.abs(u)) * dt;
+      const ah = ax * sn + az * cs;
+      u += ((ah < 0 ? ah * 0.3 : ah) - drag * u * Math.abs(u)) * dt;   // going uphill (ramps, walls) barely slows her
       if (s.boostT > 0) u += 260 * dt;
       if (u < 90 && s.state === "ski") u += 140 * dt;            // skate when it's flat
       w += (ax * cs - az * sn) * 0.25 * dt;                      // a little sidehill slip
       w *= Math.exp(-(ice ? 1.6 : 7) * dt);                       // edges grip (less on ice)
-      if (s.state === "tumble") { u *= 1 - 3 * dt; w *= 1 - 3 * dt; }
+      if (s.state === "tumble") { u *= 1 - 0.25 * dt; w *= 1 - 3 * dt; }   // she rolls, keeps her speed
       if (s.state === "arrive") { u *= 1 - 2.2 * dt; w *= 1 - 4 * dt; if (s.z > FINISH - 80) u = Math.min(u, 10); }
       s.vx = u * sn + w * cs; s.v = u * cs - w * sn;
     }
@@ -327,14 +328,16 @@ const WolfCreekLevel = (() => {
       const gv = (gNew - s.y) / dt;
       if (s.state === "ski" && gv < s.vy - G * dt * 1.6 - 30) {   // the ground fell away
         s.air = true; s.airT = 0; s.bigAir = false; s.spinAcc = 0;
-        if (KICKERS.some((k) => Math.abs(s.z - k.z) < 30 && Math.abs(s.x - k.x) < k.w / 2 + 20)) { s.vy += 150; Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700); } // pop off the lip
+        const offCliff = CLIFFS.some((c) => s.z > c - 10 && s.z < c + 40) && Math.min(...CHUTES(s.z).map((q) => Math.abs(s.x - q))) > 90;
+        if (offCliff) { s.vy += 120; Engine.toast(pick(L.cliffSend), "good"); Sfx.tone(250, 0.4, "triangle", 0.09, 0, 800); }
+        if (KICKERS.some((k) => Math.abs(s.z - k.z) < 50 && Math.abs(s.x - k.x) < k.w / 2 + 20)) { s.vy += 150; Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700); } // pop off the lip
         s.vy -= G_AIR * dt; s.y += s.vy * dt;
       } else { s.vy = gv; s.y = gNew; }
     } else {
       s.airT += dt;
       s.vy -= G_AIR * dt; s.y += s.vy * dt;
       if (s.airT > 0.7) s.bigAir = true;
-      if (s.y <= gNew) { s.y = gNew; s.air = false; s.vy = 0; land(); }
+      if (s.y <= gNew) { const vyi = s.vy; s.y = gNew; s.air = false; s.vy = 0; land(vyi); }
     }
     s.h = Math.max(0, s.y - gNew);
     // the body: lean into turns, tuck when it's straight and fast, absorb landings
@@ -434,7 +437,13 @@ const WolfCreekLevel = (() => {
     Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700);
   }
 
-  function land() {
+  function land(vyi) {
+    // landing on a downslope turns the fall into speed (like real skiing)
+    if (vyi < 0) {
+      const d = Math.atan2(s.vx, s.v), gAlong = gradX(s.x, s.z) * Math.sin(d) + gradZ(s.x, s.z) * Math.cos(d);
+      const gain = Math.min(220, -vyi * Math.max(0, -gAlong) * 0.9), sp = Math.hypot(s.vx, s.v) || 1;
+      s.vx += s.vx / sp * gain; s.v += s.v / sp * gain;
+    }
     if (s.airT < 0.12) return; // just a little hop
     Sfx.noise(0.18, 0.2, true);
     s.comp = Math.min(1, 0.3 + s.airT);
@@ -467,7 +476,7 @@ const WolfCreekLevel = (() => {
   function hitTree() {
     if (s.invuln > 0) return;
     s.invuln = 1; s.treesHit++;
-    s.white = 1; s.v *= 0.35; s.vx *= -0.5;
+    s.white = 1; s.v *= 0.6; s.vx *= -0.4;
     s.fx.push({ n: 50, spread: 140, up: 140 });
     Sfx.crash(); Sfx.noise(0.6, 0.3, true); Engine.shake = 6;
     loseFlower();
@@ -477,7 +486,7 @@ const WolfCreekLevel = (() => {
 
   function yardSale(quiet) {
     if (s.invuln > 0 || s.state !== "ski") return;
-    s.state = "tumble"; s.tumbleT = quiet ? 1.0 : 1.6; s.yardSales++;
+    s.state = "tumble"; s.tumbleT = quiet ? 0.9 : 1.2; s.yardSales++;
     s.air = false; s.h = 0; s.y = ground(s.x, s.z); s.vy = 0; s.heading *= 0.3;
     ToePrompt.cancel();
     Sfx.crash(); Engine.shake = 7;
