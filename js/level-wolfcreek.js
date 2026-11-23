@@ -361,7 +361,6 @@ const WolfCreekLevel = (() => {
     once("gully", z > GULLY[0], () => Engine.toast(L.gully, "good"));
     CLIFFS.forEach((c, i) => once("cliffW" + i, z > c - 700, () => Engine.toast(i ? L.cliff : L.cliffChoice, "bad")));
     once("ice", z > ICE[0] - 200, () => Engine.toast(L.ice, "bad"));
-    once("iceToe", z > (ICE[0] + ICE[1]) / 2, () => { if (!ToePrompt.active) { Engine.toast(L.iceToe); startToe(1.9); } });
     once("sleds", z > SLEDS[0], () => { Engine.toast(L.sledsAppear, "bad"); Sfx.honk(); });
     CHADS.forEach((c, i) => once("chad" + i, z > c, () => spawnChad(i)));
     once("gp", z > GRANDPARENTS - 1500, () => { s.gp = { alt: 320 }; });
@@ -372,12 +371,7 @@ const WolfCreekLevel = (() => {
     // the beacon keeps quietly beeping
     s.nextBeep -= dt;
     if (s.nextBeep <= 0) { s.nextBeep = 9; Sfx.tone(2200, 0.05, "sine", 0.025); }
-    // random toe hooks
-    const quiet = inCalm(z) || (s.ava && !s.ava.done) || z > FINISH - 2000;
-    if (!ToePrompt.active && !quiet) {
-      s.nextToe -= dt;
-      if (s.nextToe <= 0) { startToe(); s.nextToe = rand(13, 19); }
-    }
+    // (only one HOOK THE TOE on this level: clicking into the bindings at the top)
     if (z >= FINISH - 400) finish();
   }
 
