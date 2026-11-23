@@ -328,6 +328,16 @@ const Ski3D = (() => {
           }
         }
         const warn = textSprite("⚠ CLIFF", "#e63946", 22); warn.position.set(w.cx(o.z), w.ground(w.cx(o.z), o.z) + 40, -o.z); m.add(warn);
+      } else if (o.type === "kicker") {
+        // orange marker poles on both sides of the lip
+        m = new THREE.Group();
+        const pm = new THREE.MeshLambertMaterial({ color: "#ff6b00" });
+        for (const sx of [-1, 1]) {
+          const px = o.x + sx * (o.w / 2 + 14);
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 46, 6), pm); pole.position.set(px, w.ground(px, o.z) + 23, -o.z); m.add(pole);
+          const fl = new THREE.Mesh(new THREE.PlaneGeometry(14, 9), new THREE.MeshLambertMaterial({ color: "#ff6b00", side: THREE.DoubleSide }));
+          fl.position.set(px + sx * 7, w.ground(px, o.z) + 41, -o.z); m.add(fl);
+        }
       } else if (o.type === "sled") {
         m = makeSled(false);
         const y = textSprite(o.yell, "#e63946", 14); y.position.set(0, 80, 0); m.add(y);
@@ -418,7 +428,7 @@ const Ski3D = (() => {
       if (o.z < lo || o.z > hi || o.got) continue;
       if (o.type === "tree" && nt < MAX_TREES) { o.gy = o.gy ?? world.ground(o.x, o.z); put(trees, nt++, o.x, o.gy - 2, o.z, o.sz, o.sz, o.sz, o.z); }
       else if (o.type === "rock" && nr < MAX_ROCKS) { o.gy = o.gy ?? world.ground(o.x, o.z); put(rocks, nr++, o.x, o.gy - o.r * 0.25, o.z, o.r * 1.25, o.r * 1.1, o.r, o.z); }
-      else if (o.type === "pillow" && np < MAX_PILLOWS) { o.gy = o.gy ?? world.ground(o.x, o.z); put(pillows, np++, o.x, o.gy - 4, o.z, 48, 24, 40, 0); }
+      else if (o.type === "pillow" && np < MAX_PILLOWS) { o.gy = o.gy ?? world.ground(o.x, o.z); put(pillows, np++, o.x, o.gy - 30, o.z, 52, 33, 50, 0); }
     }
     for (const o of world.edge) {
       if (o.z < lo || o.z > hi) continue;
@@ -517,7 +527,10 @@ const Ski3D = (() => {
     camera.rotateZ(-s.lean * 0.1);
 
     placeInstances(s);
-    for (const [o, m] of dyn.flowers) { m.visible = !o.got && o.z > s.z - 260 && o.z < s.z + 2700; if (m.visible && o.type !== "flower") m.position.y = world.ground(o.x, o.z) + 34 + Math.sin(s.t * 4) * 4; }
+    for (const [o, m] of dyn.flowers) {
+      m.visible = !o.got && o.z > s.z - 260 && o.z < s.z + 2700;
+      if (m.visible && o.type !== "flower") m.position.set(o.x, world.ground(o.x, o.z) + 34 + (o.h || 0) + Math.sin(s.t * 4) * 4, -o.z);
+    }
     for (const [o, m] of dyn.notes) { m.visible = !o.got; m.position.set(o.x, world.ground(o.x, o.z), -o.z); }
     for (const [o, m] of dyn.sleds) {
       m.visible = o.go && !o.got;

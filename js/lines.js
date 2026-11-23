@@ -315,6 +315,16 @@ const LINES = {
     ],
     creekWarning: "Creek crossing. Use the snow bridges.",
     pillows: "Pillow line. Send it.",
+    kickerHint: "Wind lip ahead. Hit it fast. Hold left or right in the air to spin. Land straight.",
+    gully: "The Gully. Ride the walls.",
+    cliffChoice: "CLIFF. Huck it or take a ramp. Your call.",
+    creekDitch: "Stuck in a ditch. Again.",
+    sideways: "You landed sideways. That's not how skiing works.",
+    spinLanded: [
+      "THREE-SIXTY. Who taught you that.",
+      "SEVEN-TWENTY. Okay show-off.",
+      "TEN-EIGHTY?! Reese. REESE.",
+    ],
     cliff: "CLIFF. SEND IT.",
     landed: [
       "Stomped it.",

@@ -10,7 +10,8 @@ const WolfCreekLevel = (() => {
   const HALF = 620;               // half the width of the open mountain (dune walls beyond)
   const D0 = 300;                 // camera focal length (world units)
   const VIEW = 2600;              // how far ahead we draw
-  const POWDER = [0, 9000], GLADES = [9000, 15000], CREEK = 15600, PILLOWS = [19800, 26000];
+  const POWDER = [0, 9000], GLADES = [9000, 15000], CREEK = 15600, PILLOWS = [23000, 24700];
+  const GULLY = [19400, 22000];
   const CLIFFS = [22400, 25000], ICE = [26600, 32000], SLEDS = [34800, 41000];
   const MEMS = [18300, 33300, 42600];
   const CALM = MEMS.map((m) => [m - 1700, m + 500]); // empty, slow open bowls before each note
@@ -20,11 +21,25 @@ const WolfCreekLevel = (() => {
   const CLEARS = 47200, CHARM = 48200;
   const SNICKERS = [3600, 7400, 13000, 21000, 28800, 36800, 40200, 45600];
   const SKIER_R = 16;
-  const G = 900;                  // gravity
+  const G = 900;                  // gravity on the snow
+  const G_AIR = 520;              // floatier in the air (time to spin)
   const DRAG = 0.0013;            // air + snow drag (top speed ~370 on a normal pitch)
   const CLIFF_DROP = [120, 165];
   const CHUTES = (c) => [-2, -1, 0, 1, 2].map((k) => cx(c) + k * 400 + 90); // ramps through each cliff band
-  const ROLLERS = [[5200, 8200], [19800, 21800], [37600, 40200]];
+  const ROLLERS = [[5200, 8200], [37600, 40200]];
+  // Kickers (wind lips): real ramps in the snow. Flowers hang in the air past the lip.
+  const KICKERS = [[2600, 0], [4300, -220], [6100, 200], [7900, -60], [36300, 150], [46800, 0]].map(([z, dx]) => ({ z, x: cx(z) + dx, w: z === 46800 ? 280 : 170, h: 62, len: 115 }));
+  const BRIDGES = [-250, 50, 350].map((d) => cx(CREEK) + d);
+  // Pillows: round snow mounds that pop you into the air
+  const PILLOW_T = (() => {
+    const out = [];
+    for (let z = PILLOWS[0] + 100; z < PILLOWS[1]; z += 170) for (let k = 0; k < 3; k++) {
+      const hz = Math.sin(z * 12.9 + k * 78.2) * 43758.5; const h = hz - Math.floor(hz);
+      out.push({ z: z + k * 50, x: cx(z) + (h - 0.5) * 900, r: 55, h: 34 });
+    }
+    return out;
+  })();
+  const gullyX = (z) => cx(z) + 160 * Math.sin((z - GULLY[0]) / 700);
 
   let s;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -77,8 +92,39 @@ const WolfCreekLevel = (() => {
       cliff -= CLIFF_DROP[i] * smooth(c, c + w, z);
     });
     const dune = Math.min(1, out / 140) * (40 * Math.pow(Math.sin(x / 150 + z / 330), 2) + 22 * Math.sin(x / 61 + z / 170));
-    const calm = 1 - 0.6 * calmAmount(z);
-    return base(z) + (roll + ridge + roller) * calm + cliff + out * 0.35 + out * out * 0.0014 + dune;
+    // the Gully: a natural halfpipe
+    let gully = 0, gf = 0;
+    if (z > GULLY[0] && z < GULLY[1]) {
+      gf = smooth(GULLY[0], GULLY[0] + 400, z) * smooth(GULLY[1], GULLY[1] - 400, z);
+      const d = Math.min(Math.abs(x - gullyX(z)), 250);
+      gully = gf * d * d * 0.0022;
+    }
+    // kickers
+    let kick = 0;
+    for (const k of KICKERS) {
+      const dz = z - k.z;
+      if (dz < -k.len || dz > 14) continue;
+      const lat = smooth(k.w / 2 + 30, k.w / 2, Math.abs(x - k.x));
+      if (lat <= 0) continue;
+      kick += lat * (dz <= 0 ? k.h * Math.pow((dz + k.len) / k.len, 1.6) : k.h * (1 - dz / 14));
+    }
+    // pillows
+    let pil = 0;
+    if (z > PILLOWS[0] && z < PILLOWS[1] + 200) for (const q of PILLOW_T) {
+      if (Math.abs(z - q.z) > q.r) continue;
+      const d = Math.hypot(x - q.x, z - q.z);
+      if (d < q.r) { const u = 1 - (d / q.r) * (d / q.r); pil += q.h * u * u; }
+    }
+    // the creek: a ditch with a lip in front of it (snow bridges stay flat)
+    let creek = 0;
+    if (Math.abs(z - CREEK) < 160) {
+      const br = Math.max(...BRIDGES.map((b) => smooth(75, 50, Math.abs(x - b))));
+      creek = -28 * Math.exp(-Math.pow((z - CREEK) / 24, 2)) * (1 - br);
+      const dz = z - (CREEK - 55);
+      if (dz > -70 && dz < 12) creek += (1 - br) * (dz <= 0 ? 24 * Math.pow((dz + 70) / 70, 1.6) : 24 * (1 - dz / 12));
+    }
+    const calm = (1 - 0.6 * calmAmount(z)) * (1 - 0.75 * gf);
+    return base(z) + (roll + ridge + roller) * calm + cliff + gully + kick + pil + creek + out * 0.35 + out * out * 0.0014 + dune;
   }
   const gradX = (x, z) => (ground(x + 3, z) - ground(x - 3, z)) / 6;
   const gradZ = (x, z) => (ground(x, z + 3) - ground(x, z - 3)) / 6;
@@ -103,7 +149,7 @@ const WolfCreekLevel = (() => {
   function reset() {
     s = {
       z: 0, x: 0, vx: 0, v: 0, boost: 0, boostT: 0, h: 0, vh: 0, air: false, lean: 0, camX: 0, t: 0,
-      y: 0, vy: 0, heading: 0, airT: 0, comp: 0, tuck: 0, plant: null, lastSteer: 0, skid: 0,
+      y: 0, vy: 0, heading: 0, airT: 0, comp: 0, tuck: 0, plant: null, lastSteer: 0, skid: 0, spinAcc: 0, spins: 0,
       state: "intro", flowers: 0, toes: 0, treesHit: 0, yardSales: 0, sledHits: 0, dunks: 0, notes: 0, charm: false,
       objs: [], flakes: [], floaters: [], flags: {}, invuln: 0, white: 0, tumbleT: 0, gear: [],
       zoom: 1, shrinkT: 0, smallPending: false, nextToe: 14, nextBeep: 6,
@@ -146,20 +192,20 @@ const WolfCreekLevel = (() => {
       const p = onIce(z) ? 0.5 : below ? 0.5 : 0.2;
       for (let k = 0; k < 3; k++) if (hash(z, 7 + k * 3) < p) add({ type: "rock", z: z + k * 30, x: across(z, 30 + k), r: 18 + hash(z, 9 + k) * 14 });
     }
-    // pillows (small jumps) with flowers floating over them
-    for (let z = PILLOWS[0] + 200; z < PILLOWS[1]; z += 420) {
-      if (CLIFFS.some((c) => Math.abs(z - c) < 350)) continue;
-      for (let k = 0; k < 2; k++) {
-        const x = across(z, 10 + k);
-        add({ type: "pillow", z, x });
-        add({ type: "flower", z: z + 110, x, h: 45, hue: (Math.floor(z / 7) + k) % 3 });
-      }
+    // pillows (part of the terrain) with flowers floating over some of them
+    PILLOW_T.forEach((q, i) => { add({ type: "pillow", z: q.z, x: q.x }); if (i % 2 === 0) add({ type: "flower", z: q.z + 90, x: q.x, h: 40, hue: i % 3 }); });
+    // kickers: flowers hang in the air past the lip (you only get them if you send it)
+    KICKERS.forEach((k, i) => {
+      add({ type: "kicker", z: k.z, x: k.x, w: k.w });
+      if (k.z !== 46800) for (let j = 0; j < 3; j++) add({ type: "flower", z: k.z + 90 + j * 90, x: k.x, h: [75, 105, 115][j], hue: (i + j) % 3 });
+    });
+    // the Gully: flowers up on the walls
+    for (let z = GULLY[0] + 500; z < GULLY[1] - 400; z += 260) {
+      const side = (Math.floor(z / 260) % 2) ? 1 : -1;
+      add({ type: "flower", z, x: gullyX(z) + side * 150, h: 0, hue: Math.floor(z / 260) % 3 });
     }
-    for (const z of [3000, 5200, 7600]) { const x = cx(z) + (hash(z, 2) - 0.5) * 300; add({ type: "pillow", z, x }); add({ type: "flower", z: z + 110, x, h: 45, hue: 1 }); }
     CLIFFS.forEach((z) => add({ type: "cliff", z }));
-    const bridges = [];
-    for (let x = cx(CREEK) - HALF + 60; x < cx(CREEK) + HALF; x += 290) bridges.push(x);
-    add({ type: "creek", z: CREEK, bridges });
+    add({ type: "creek", z: CREEK, bridges: BRIDGES });
     // chrysanthemums in little lines all over
     for (let z = 1200; z < FINISH - 1500; z += 520 + Math.floor(hash(z, 11) * 260)) {
       if (!clearOf(z, 200)) continue;
@@ -170,13 +216,16 @@ const WolfCreekLevel = (() => {
     MEMS.forEach((z, n) => add({ type: "note", z, x: cx(z) + (n % 2 ? 60 : -60), n }));
     // crossing snowmobiles in the ΣΤΓ section
     for (let z = SLEDS[0] + 300; z < SLEDS[1]; z += 1100) add({ type: "sled", z, x: 0, dir: hash(z, 13) < 0.5 ? 1 : -1, go: false, yell: pick(L.sledYell) });
-    add({ type: "charm", z: CHARM, x: cx(CHARM) });
+    add({ type: "charm", z: 46800 + 150, x: cx(46800), h: 60 }); // above the last kicker
     add({ type: "road", z: FINISH });
     add({ type: "sign", z: FINISH - 120, x: cx(FINISH) + 220, text: L.roadSign, color: "#2d6a4f" });
     add({ type: "ditchSled", z: FINISH + 40, x: cx(FINISH) - 200 });
     // keep obstacles off the notes, charm and bridges
     const bad = (o) => (o.type === "tree" || o.type === "rock") &&
-      ([...MEMS, CHARM].some((m) => Math.abs(o.z - m) < 200) || (Math.abs(o.z - CREEK) < 160));
+      ([...MEMS, CHARM].some((m) => Math.abs(o.z - m) < 200) || (Math.abs(o.z - CREEK) < 160) ||
+       (o.z > GULLY[0] && o.z < GULLY[1] && Math.abs(o.x - gullyX(o.z)) < 300) ||
+       KICKERS.some((k) => o.z > k.z - 260 && o.z < k.z + 650 && Math.abs(o.x - k.x) < k.w + 40) ||
+       PILLOW_T.some((q) => Math.abs(o.z - q.z) < 90 && Math.abs(o.x - q.x) < 90));
     s.objs = s.objs.filter((o) => !bad(o));
     s.objs.sort((a, b) => a.z - b.z);
   }
@@ -238,15 +287,22 @@ const WolfCreekLevel = (() => {
     if (steer && steer !== s.lastSteer && !s.air) s.plant = { side: steer, t: 0.4 };
     s.lastSteer = steer;
     if (s.plant) { s.plant.t -= dt; if (s.plant.t <= 0) s.plant = null; }
-    const turnRate = s.air ? 3.2 : ice ? 1.3 : 2.5;
+    // in the air left/right spins her (slowly at first, so little hops don't spin you out)
+    const turnRate = s.air ? (s.airT < 0.12 ? 2.5 : 10) : ice ? 1.3 : 2.5;
     const prevHeading = s.heading;
-    if (steer) s.heading += steer * turnRate * dt;
+    if (steer) { s.heading += steer * turnRate * dt; if (s.air) s.spinAcc += steer * turnRate * dt; }
     else if (!s.air) s.heading -= s.heading * Math.min(1, 1.4 * dt); // settles back to the fall line
-    s.heading = clamp(s.heading, -1.35, 1.35);
+    else if (s.airT > 0.12) {
+      // let go mid-air and she rotates to the nearest clean landing (finishing a spin if she's past halfway)
+      const dir = Math.atan2(s.vx, s.v), k = Math.round((s.heading - dir) / (Math.PI * 2));
+      const want = dir + k * Math.PI * 2, step = clamp(want - s.heading, -8 * dt, 8 * dt);
+      s.heading += step; s.spinAcc += step;
+    }
+    if (!s.air) s.heading = clamp(s.heading, -1.35, 1.35);
     const sn = Math.sin(s.heading), cs = Math.cos(s.heading);
     let u = s.vx * sn + s.v * cs;      // speed along the skis
     let w = s.vx * cs - s.v * sn;      // sideways slip
-    if (!s.air) {
+    if (!s.air || s.h < 8) {          // tiny hops still carve
       const ax = -G * gradX(s.x, s.z), az = -G * gradZ(s.x, s.z);
       const drag = DRAG * (s.zoneDeep ? 1.25 : 1) * (ice ? 0.85 : 1);
       u += (ax * sn + az * cs - drag * u * Math.abs(u)) * dt;
@@ -269,14 +325,15 @@ const WolfCreekLevel = (() => {
     const gNew = ground(s.x, s.z);
     if (!s.air) {
       const gv = (gNew - s.y) / dt;
-      if (s.state === "ski" && gv < s.vy - G * dt * 1.6 - 14) {   // the ground fell away
-        s.air = true; s.airT = 0; s.bigAir = false;
-        s.vy -= G * dt; s.y += s.vy * dt;
+      if (s.state === "ski" && gv < s.vy - G * dt * 1.6 - 30) {   // the ground fell away
+        s.air = true; s.airT = 0; s.bigAir = false; s.spinAcc = 0;
+        if (KICKERS.some((k) => Math.abs(s.z - k.z) < 30 && Math.abs(s.x - k.x) < k.w / 2 + 20)) { s.vy += 150; Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700); } // pop off the lip
+        s.vy -= G_AIR * dt; s.y += s.vy * dt;
       } else { s.vy = gv; s.y = gNew; }
     } else {
       s.airT += dt;
-      s.vy -= G * dt; s.y += s.vy * dt;
-      if (s.airT > 0.55) s.bigAir = true;
+      s.vy -= G_AIR * dt; s.y += s.vy * dt;
+      if (s.airT > 0.7) s.bigAir = true;
       if (s.y <= gNew) { s.y = gNew; s.air = false; s.vy = 0; land(); }
     }
     s.h = Math.max(0, s.y - gNew);
@@ -295,8 +352,10 @@ const WolfCreekLevel = (() => {
     once("powderEnds", z > POWDER[1] - 300, () => Engine.toast(L.powderEnds));
     once("glades", z > GLADES[0] - 500, () => Engine.toast(L.glades));
     once("creek", z > CREEK - 1100, () => Engine.toast(L.creekWarning, "bad"));
-    once("pillows", z > PILLOWS[0], () => Engine.toast(L.pillows));
-    CLIFFS.forEach((c, i) => once("cliffW" + i, z > c - 700, () => Engine.toast(L.cliff, "bad")));
+    once("pillows", z > PILLOWS[0] - 300, () => Engine.toast(L.pillows));
+    once("kickHint", z > KICKERS[0].z - 900, () => Engine.toast(L.kickerHint, "good"));
+    once("gully", z > GULLY[0], () => Engine.toast(L.gully, "good"));
+    CLIFFS.forEach((c, i) => once("cliffW" + i, z > c - 700, () => Engine.toast(i ? L.cliff : L.cliffChoice, "bad")));
     once("ice", z > ICE[0] - 200, () => Engine.toast(L.ice, "bad"));
     once("iceToe", z > (ICE[0] + ICE[1]) / 2, () => { if (!ToePrompt.active) { Engine.toast(L.iceToe); startToe(1.9); } });
     once("sleds", z > SLEDS[0], () => { Engine.toast(L.sledsAppear, "bad"); Sfx.honk(); });
@@ -339,18 +398,15 @@ const WolfCreekLevel = (() => {
         case "rock":
           if (hitZ && dx < o.r + SKIER_R - 4 && s.h < o.r) { o.got = true; yardSale(); }
           break;
-        case "pillow":
-          if (hitZ && dx < 46 && !s.air) launch(330, false);
-          break;
 
         case "creek":
           if (hitZ && !o.got && !s.air) {
             o.got = true;
-            if (!o.bridges.some((b) => Math.abs(s.x - b) < 55)) coldWater();
+            if (s.h < 10 && !o.bridges.some((b) => Math.abs(s.x - b) < 60)) { coldWater(); Engine.toast(L.creekDitch, "bad"); }
           }
           break;
         case "flower":
-          if (Math.abs(o.z - s.z) < 22 && dx < 30 && Math.abs(s.h - o.h) < 40) { o.got = true; s.flowers++; Sfx.flower(); }
+          if (Math.abs(o.z - s.z) < 24 && dx < 34 && Math.abs(s.h - o.h) < 45) { o.got = true; s.flowers++; Sfx.flower(); }
           break;
         case "snickers":
           if (Math.abs(o.z - s.z) < 24 && dx < 34) {
@@ -361,7 +417,7 @@ const WolfCreekLevel = (() => {
           if (Math.abs(o.z - s.z) < 26 && dx < 40) { o.got = true; s.notes++; Sfx.fanfare(); showMemory(o.n); }
           break;
         case "charm":
-          if (Math.abs(o.z - s.z) < 30 && dx < 44) {
+          if (Math.abs(o.z - s.z) < 30 && dx < 50 && Math.abs(s.h - (o.h || 0)) < 60) {
             o.got = true; s.charm = true; Sfx.fanfare(); Confetti.burst(80, Engine.W); Engine.toast(L.gotCharm, "good");
           }
           break;
@@ -385,7 +441,18 @@ const WolfCreekLevel = (() => {
     s.fx.push({ n: s.bigAir ? 40 : 18, spread: 120, up: 90 });
     // landed sideways?
     const dir = Math.atan2(s.vx, s.v);
-    if (s.airT > 0.35 && Math.abs(dir - s.heading) > 1.1) { yardSale(); return; }
+    let diff = s.heading - dir;
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    s.heading = dir + diff;
+    if (s.airT > 0.3 && Math.abs(diff) > 1.1) { s.heading = dir; yardSale(); Engine.toast(L.sideways, "bad"); return; }
+    const spins = Math.floor((Math.abs(s.spinAcc) + 0.7) / (Math.PI * 2));
+    if (spins > 0) {
+      s.spins += spins; s.flowers += 2 * spins;
+      Engine.toast(L.spinLanded[Math.min(spins, L.spinLanded.length) - 1], "good");
+      Sfx.fanfare(); Confetti.burst(30 * spins, Engine.W);
+      s.floaters.push({ x: skScr().x, y: skScr().y - 60, text: "+" + 2 * spins + " 🌼", t: 0, good: true });
+      s.bigAir = false;
+    }
     // landing on a rock = yard sale
     const rock = s.objs.find((o) => o.type === "rock" && !o.got && Math.abs(o.z - s.z) < 40 && Math.abs(o.x - s.x) < o.r + SKIER_R);
     if (rock) { rock.got = true; yardSale(); return; }
@@ -433,7 +500,13 @@ const WolfCreekLevel = (() => {
   function updateNotes(dt) {
     if (s.state === "intro" || s.state === "done") return;
     for (const o of s.objs) {
-      if (o.type !== "note" || o.got) continue;
+      if ((o.type !== "note" && o.type !== "charm") || o.got) continue;
+      if (o.type === "charm") { // the charm can't be missed either: it drifts to her (and down to her height)
+        const ah = o.z - s.z;
+        if (ah > -10 && ah < 420) { o.x += (s.x - o.x) * Math.min(1, dt * 2.6); o.h += (s.h - o.h) * Math.min(1, dt * 3); }
+        if (ah < -60) { o.z = s.z + 700; o.x = s.x; o.h = 0; s.objs.sort((a, b) => a.z - b.z); }
+        continue;
+      }
       const ahead = o.z - s.z;
       if (ahead > -10 && ahead < 380) o.x += (s.x - o.x) * Math.min(1, dt * 2.4);
       if (ahead < -60) {
@@ -596,6 +669,7 @@ const WolfCreekLevel = (() => {
         { icon: "🧦", value: s.yardSales, label: "yard sales" },
         { icon: "🛷", value: s.sledHits, label: "times ΣΤΓ got you" },
         { icon: "💌", value: s.notes + "/" + MEMS.length, label: "notes found" },
+        { icon: "🌀", value: s.spins, label: "spins landed" },
       ],
       note: L.note,
     });
@@ -683,7 +757,7 @@ const WolfCreekLevel = (() => {
     if (s.white > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(0.92, s.white)})`; ctx.fillRect(0, 0, W, H); }
     for (const f of s.floaters) {
       ctx.globalAlpha = 1 - f.t / 1.8; ctx.font = "800 18px 'Baloo 2', sans-serif"; ctx.textAlign = "center";
-      ctx.fillStyle = "#e63946"; ctx.fillText(f.text, f.x, f.y); ctx.globalAlpha = 1;
+      ctx.fillStyle = f.good ? "#2a9d8f" : "#e63946"; ctx.fillText(f.text, f.x, f.y); ctx.globalAlpha = 1;
     }
     if (s.ava && !s.ava.done && s.state !== "done") {
       ctx.font = "800 15px 'Baloo 2', sans-serif"; ctx.textAlign = "center";
