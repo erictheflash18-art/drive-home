@@ -4,10 +4,11 @@
 
 const Ski3D = (() => {
   let renderer, glCanvas, scene, camera, sun, hemi, sky, fog;
+  let sparkle, tracks;
   let terrain, tGeo, trees, rocks, pillows, shadow, peng, spray, snow, mountains;
   let built = [], dyn = {}, texCache = {};
   let world, lastT = 0, camY = null, camLX = 0, camYaw = 0, originKey = "";
-  const NX = 46, NZ = 104, CELL_X = 34, CELL_Z = 28;
+  const NX = 64, NZ = 150, CELL_X = 26, CELL_Z = 21;
   const MAX_TREES = 1500, MAX_ROCKS = 500, MAX_PILLOWS = 80;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -206,6 +207,70 @@ const Ski3D = (() => {
     return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color }));
   }
 
+  // a soft snow surface: faint wind ripples and speckles, tiled in world space
+  function snowTexture() {
+    const c = document.createElement("canvas"); c.width = c.height = 256;
+    const x = c.getContext("2d");
+    x.fillStyle = "#ffffff"; x.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 26; i++) {                          // wind ripples
+      const y0 = (i / 26) * 256 + Math.sin(i * 7.1) * 6;
+      x.strokeStyle = `rgba(150,175,210,${0.05 + 0.05 * Math.abs(Math.sin(i * 3.3))})`; x.lineWidth = 2 + (i % 3);
+      x.beginPath();
+      for (let k = 0; k <= 256; k += 8) x.lineTo(k, y0 + Math.sin(k / 30 + i) * 4 + Math.sin(k / 11 + i * 2) * 1.5);
+      x.stroke();
+    }
+    for (let i = 0; i < 1400; i++) {                        // speckles
+      const a = Math.random() * 0.08;
+      x.fillStyle = Math.random() < 0.7 ? `rgba(130,160,200,${a})` : `rgba(255,255,255,${a * 4})`;
+      x.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
+    return t;
+  }
+
+  // ski tracks: two grooves behind her, as a strip that follows the last few hundred units
+  const TRACK_N = 160;
+  function makeTracks() {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(TRACK_N * 2 * 2 * 3), 3));
+    const idx = [];
+    for (let k = 0; k < 2; k++) for (let i = 0; i < TRACK_N - 1; i++) {
+      const a = (k * TRACK_N + i) * 2;
+      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+    g.setIndex(idx);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: "#a9bdd6", transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+    m.frustumCulled = false; m.renderOrder = 1;
+    m.userData.pts = [];
+    return m;
+  }
+  function updateTracks(s) {
+    const pts = tracks.userData.pts;
+    const last = pts[pts.length - 1];
+    const onSnow = !s.air && s.state !== "tumble" && s.h < 3;
+    if (!last || Math.hypot(s.x - last.x, s.z - last.z) > 9) {
+      pts.push({ x: s.x, z: s.z, hd: s.heading, on: onSnow });
+      if (pts.length > TRACK_N) pts.shift();
+    }
+    const p = tracks.geometry.attributes.position;
+    for (let k = 0; k < 2; k++) {
+      const side = k ? 1 : -1;
+      for (let i = 0; i < TRACK_N; i++) {
+        const q = pts[Math.max(0, pts.length - TRACK_N + i)] || pts[0];
+        const base = (k * TRACK_N + i) * 2;
+        if (!q) { p.setXYZ(base, 0, -1e5, 0); p.setXYZ(base + 1, 0, -1e5, 0); continue; }
+        const cs = Math.cos(q.hd), sn = Math.sin(q.hd);
+        const ox = cs * side * 6, oz = -sn * side * 6;       // perpendicular to the skis
+        const y = q.on ? world.ground(q.x + ox, q.z + oz) + 0.6 : -1e5;
+        p.setXYZ(base, q.x + ox - cs * 1.6, y, -(q.z + oz + sn * 1.6));
+        p.setXYZ(base + 1, q.x + ox + cs * 1.6, y, -(q.z + oz - sn * 1.6));
+      }
+    }
+    p.needsUpdate = true;
+  }
+
   // ---------- build ----------
   function init(stage) {
     if (renderer) return true;
@@ -224,11 +289,11 @@ const Ski3D = (() => {
     world = w;
     if (scene) dispose();
     scene = new THREE.Scene();
-    fog = new THREE.Fog("#c9d3df", 300, 2300);
+    fog = new THREE.Fog("#dde4ec", 300, 2300);
     scene.fog = fog;
     camera = new THREE.PerspectiveCamera(66, 0.5, 2, 9000);
-    hemi = new THREE.HemisphereLight("#eef6ff", "#9fb4cc", 0.95); scene.add(hemi);
-    sun = new THREE.DirectionalLight("#fff3e0", 0.6); sun.position.set(-0.5, 1, 0.35); scene.add(sun); scene.add(sun.target);
+    hemi = new THREE.HemisphereLight("#ffffff", "#8fb0dc", 0.9); scene.add(hemi);
+    sun = new THREE.DirectionalLight("#fff6e8", 0.55); sun.position.set(-0.6, 0.8, -0.5); scene.add(sun); scene.add(sun.target);
 
     // sky dome
     const skyGeo = new THREE.SphereGeometry(7000, 24, 12);
@@ -253,7 +318,7 @@ const Ski3D = (() => {
     tGeo = new THREE.PlaneGeometry(1, 1, NX, NZ);
     tGeo.rotateX(-Math.PI / 2);
     tGeo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(tGeo.attributes.position.count * 3), 3));
-    terrain = new THREE.Mesh(tGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    terrain = new THREE.Mesh(tGeo, new THREE.MeshPhongMaterial({ vertexColors: true, map: snowTexture(), shininess: 18, specular: new THREE.Color("#2a3440") }));
     terrain.frustumCulled = false;
     scene.add(terrain);
     originKey = "";
@@ -271,6 +336,10 @@ const Ski3D = (() => {
     spray = makePoints(420); spray.userData = { i: 0, p: [] }; scene.add(spray);
     for (let i = 0; i < 420; i++) spray.userData.p.push({ life: 0 });
     snow = makePoints(600); scene.add(snow);
+    sparkle = makePoints(260); scene.add(sparkle);
+    sparkle.userData = { p: [] };
+    for (let i = 0; i < 260; i++) sparkle.userData.p.push({ ph: Math.random() * 6.28, rate: rand(2, 5) });
+    tracks = makeTracks(); scene.add(tracks);
     snow.userData = { p: [] };
     for (let i = 0; i < 600; i++) snow.userData.p.push({ v: rand(30, 70) });
 
@@ -388,13 +457,13 @@ const Ski3D = (() => {
 
   // ---------- per frame ----------
   function regenTerrain(s) {
-    const x0 = Math.floor((s.x - NX * CELL_X / 2) / CELL_X) * CELL_X;
-    const z0 = Math.floor((s.z - 420) / CELL_Z) * CELL_Z;
+    const x0 = Math.floor((s.x - NX * CELL_X / 2) / (CELL_X * 4)) * CELL_X * 4;
+    const z0 = Math.floor((s.z - 480) / (CELL_Z * 4)) * CELL_Z * 4;
     const key = x0 + ":" + z0;
     if (key === originKey) return;
     originKey = key;
-    const p = tGeo.attributes.position, col = tGeo.attributes.color;
-    const snowC = new THREE.Color("#f6f9fd"), iceC = new THREE.Color("#b9cbdc"), bermC = new THREE.Color("#e9f0f8");
+    const p = tGeo.attributes.position, col = tGeo.attributes.color, uv = tGeo.attributes.uv;
+    const snowC = new THREE.Color("#ffffff"), iceC = new THREE.Color("#c4d6ea"), bermC = new THREE.Color("#f1f6fc");
     const c = new THREE.Color();
     for (let iz = 0; iz <= NZ; iz++) {
       const z = z0 + iz * CELL_Z;
@@ -402,6 +471,7 @@ const Ski3D = (() => {
       for (let ix = 0; ix <= NX; ix++) {
         const i = iz * (NX + 1) + ix, x = x0 + ix * CELL_X;
         p.setXYZ(i, x, world.ground(x, z), -z);
+        uv.setXY(i, x / 160, z / 160);
         const out = Math.max(0, Math.abs(x - cxz) - world.HALF);
         c.copy(ice && out < 20 ? iceC : snowC).lerp(bermC, Math.min(1, out / 200));
         col.setXYZ(i, c.r, c.g, c.b);
@@ -414,7 +484,7 @@ const Ski3D = (() => {
       const drop = (p.getY(i) - p.getY(j)) / CELL_Z - world.pitch(z0 + iz * CELL_Z);
       if (drop > 0.9) { c.copy(hash2(ix + x0, iz + z0) > 0.5 ? rockC : rockL); col.setXYZ(i, c.r, c.g, c.b); col.setXYZ(j, c.r, c.g, c.b); }
     }
-    p.needsUpdate = true; col.needsUpdate = true;
+    p.needsUpdate = true; col.needsUpdate = true; uv.needsUpdate = true;
     tGeo.computeVertexNormals();
     tGeo.computeBoundingSphere();
   }
@@ -553,7 +623,7 @@ const Ski3D = (() => {
 
     // weather: storm → bluebird
     const st = s.storm;
-    const horizon = lerpColor("#bfe0fb", "#c9d3df", st), zenith = lerpColor("#3d8fd8", "#9aa7b8", st);
+    const horizon = lerpColor("#d6ebfb", "#dde4ec", st), zenith = lerpColor("#3d8fd8", "#a9b6c6", st);
     fog.color.copy(horizon); fog.near = 260 + 260 * (1 - st); fog.far = 2100 + 1400 * (1 - st);
     const sc = sky.geometry.attributes.color, sp = sky.geometry.attributes.position;
     for (let i = 0; i < sc.count; i++) { const t = clamp(sp.getY(i) / 3500, 0, 1); const cc = horizon.clone().lerp(zenith, Math.pow(t, 0.6)); sc.setXYZ(i, cc.r, cc.g, cc.b); }
@@ -561,10 +631,22 @@ const Ski3D = (() => {
     sky.position.copy(camera.position);
     mountains.position.set(camera.position.x, camera.position.y - 200, camera.position.z);
     mountains.children[0].material.color.copy(lerpColor("#b4c6dc", "#c6ced8", st));
-    sun.intensity = 0.45 + 0.35 * (1 - st);
-    hemi.intensity = 0.95 - 0.1 * (1 - st);
+    sun.intensity = 0.4 + 0.45 * (1 - st);
+    hemi.intensity = 0.92 - 0.12 * (1 - st);
 
     updateParticles(s, dt);
+    updateTracks(s);
+    // sparkles: glints on the snow around her (more when the sun's out)
+    const kp = sparkle.geometry.attributes.position, ks = sparkle.geometry.attributes.size, ka = sparkle.geometry.attributes.alpha;
+    sparkle.userData.p.forEach((q, i) => {
+      if (q.z == null || q.z < s.z - 60 || q.z > s.z + 900 || Math.abs(q.x - s.x) > 420) {
+        q.z = s.z + rand(20, 900); q.x = s.x + rand(-400, 400); q.y = world.ground(q.x, q.z) + 1.5;
+      }
+      kp.setXYZ(i, q.x, q.y, -q.z);
+      ks.setX(i, 2.2);
+      ka.setX(i, Math.pow(Math.max(0, Math.sin(s.t * q.rate + q.ph)), 12) * (0.5 + 0.5 * (1 - st)));
+    });
+    kp.needsUpdate = ks.needsUpdate = ka.needsUpdate = true;
     renderer.render(scene, camera);
   }
 
