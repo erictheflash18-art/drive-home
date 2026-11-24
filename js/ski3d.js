@@ -413,23 +413,88 @@ const Ski3D = (() => {
     const front = new THREE.MeshLambertMaterial({ map: tex }), side = new THREE.MeshLambertMaterial({ color: o.color });
     const b = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.h, 70), [side, side, side, side, front, side]);
     b.position.set(0, o.h / 2, 0); g.add(b);
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(o.w + 6, 6, 76), new THREE.MeshLambertMaterial({ color: "#4a4e69" })); roof.position.y = o.h + 3; g.add(roof);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(o.w + 8, 7, 78), new THREE.MeshLambertMaterial({ color: "#3d405b" })); roof.position.y = o.h + 3; g.add(roof);
+    // old-west false front / cornice, varies by building
+    const kind = Math.floor(Math.abs(Math.sin(o.z * 0.013 + o.side)) * 3);
+    if (kind === 0) { const p = new THREE.Mesh(new THREE.BoxGeometry(o.w * 0.6, 22, 6), side); p.position.set(0, o.h + 14, 34); g.add(p); }
+    if (kind === 1) { const p = new THREE.Mesh(new THREE.BoxGeometry(o.w + 10, 5, 8), new THREE.MeshLambertMaterial({ color: "#f1e3c8" })); p.position.set(0, o.h - 6, 36); g.add(p); }
+    // a real awning out over the sidewalk
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(o.w * 0.92, 3, 22), new THREE.MeshLambertMaterial({ color: o.awning || "#e63946" })); aw.position.set(0, o.h * 0.42, 44); aw.rotation.x = 0.35; g.add(aw);
     return g;
   }
 
+  // Her house: porch, windows glowing, chrysanthemum beds, a white picket fence, a REESE
+  // mailbox, balloons, a banner, and Mom waving from the porch.
   function makeHouse(o) {
     const g = new THREE.Group();
-    const wall = new THREE.MeshLambertMaterial({ color: "#f4e1c1" }), roofM = new THREE.MeshLambertMaterial({ color: "#7b3f2b" });
-    const b = new THREE.Mesh(new THREE.BoxGeometry(150, 80, 110), wall); b.position.y = 40; g.add(b);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(115, 60, 4), roofM); roof.rotation.y = Math.PI / 4; roof.position.y = 110; roof.scale.set(1, 1, 0.8); g.add(roof);
-    const door = new THREE.Mesh(new THREE.BoxGeometry(26, 44, 2), new THREE.MeshLambertMaterial({ color: "#2a9d8f" })); door.position.set(0, 22, 56); g.add(door);
-    const banner = textSprite("HAPPY BIRTHDAY REESE", "#fff", 18, "#f15bb5"); banner.position.set(0, 150, 60); banner.center.set(0.5, 0.5); g.add(banner);
-    ["#f15bb5", "#ffd60a", "#4cc9f0", "#9b5de5", "#06d6a0"].forEach((c, i) => {
-      const bl = new THREE.Mesh(new THREE.SphereGeometry(9, 10, 8), new THREE.MeshLambertMaterial({ color: c })); bl.scale.set(1, 1.2, 1);
-      bl.position.set(-70 + i * 35, 120 + (i % 2) * 14, 64); g.add(bl);
-      const str = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 40, 3), new THREE.MeshBasicMaterial({ color: "#888" })); str.position.set(-70 + i * 35, 96, 64); g.add(str);
+    const L = (c) => new THREE.MeshLambertMaterial({ color: c });
+    const wall = L("#f4e1c1"), trim = L("#ffffff"), roofM = L("#7b3f2b"), glow = new THREE.MeshBasicMaterial({ color: "#ffd98a" });
+    const box = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
+    box(170, 86, 120, wall, 0, 43, 0);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(130, 64, 4), roofM); roof.rotation.y = Math.PI / 4; roof.scale.set(1, 1, 0.75); roof.position.y = 118; g.add(roof);
+    box(14, 40, 14, L("#8d6e63"), 50, 150, -20);                           // chimney
+    box(30, 50, 3, L("#2a9d8f"), 0, 25, 61);                               // door
+    box(4, 4, 4, L("#ffd60a"), 10, 26, 63);                                // knob
+    for (const x of [-55, 55]) { box(34, 30, 2, glow, x, 52, 61); box(38, 3, 3, trim, x, 52, 62); box(3, 34, 3, trim, x, 52, 62); }  // windows
+    box(190, 6, 40, L("#a47148"), 0, 3, 80);                               // porch
+    for (const x of [-90, -30, 30, 90]) box(5, 50, 5, trim, x, 28, 98);    // porch posts
+    box(196, 6, 44, roofM, 0, 55, 80);                                     // porch roof
+    // chrysanthemum beds (her flowers)
+    const fl = ["#ff9f1c", "#f15bb5", "#fee440"].map(L);
+    for (let i = 0; i < 26; i++) { const side = i % 2 ? 1 : -1, x = side * (40 + (i % 13) * 5), z = 104 + (i % 3) * 6; const f = new THREE.Mesh(new THREE.SphereGeometry(4.5, 6, 5), fl[i % 3]); f.position.set(x, 6, z); g.add(f); }
+    // picket fence + gate gap
+    for (let x = -130; x <= 130; x += 10) { if (Math.abs(x) < 24) continue; box(3, 20, 3, trim, x, 10, 128); }
+    box(110, 3, 3, trim, -78, 14, 128); box(110, 3, 3, trim, 78, 14, 128);
+    // mailbox
+    box(4, 30, 4, L("#5c4033"), 40, 15, 140); box(16, 12, 22, L("#e63946"), 40, 34, 140);
+    const mail = textSprite("REESE", "#fff", 8, "#e63946"); mail.position.set(40, 44, 152); mail.center.set(0.5, 0); g.add(mail);
+    // Mom on the porch, waving
+    const mom = new THREE.Group();
+    const mb = new THREE.Mesh(new THREE.SphereGeometry(10, 10, 8), L("#1b1f2e")); mb.scale.set(1, 1.4, 1); mb.position.y = 16; mom.add(mb);
+    const mh = new THREE.Mesh(new THREE.SphereGeometry(7, 10, 8), L("#26304a")); mh.position.y = 35; mom.add(mh);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 16, 5), L("#1b1f2e")); arm.position.set(12, 30, 0); mom.add(arm);
+    const sign = textSprite("WELCOME HOME!", "#fff", 10, "#2a9d8f"); sign.position.set(0, 52, 0); sign.center.set(0.5, 0); mom.add(sign);
+    mom.position.set(-45, 6, 88); g.add(mom); g.userData.momArm = arm;
+    const banner = textSprite("HAPPY BIRTHDAY REESE", "#fff", 20, "#f15bb5"); banner.position.set(0, 100, 104); banner.center.set(0.5, 0.5); g.add(banner);
+    g.userData.balloons = [];
+    ["#f15bb5", "#ffd60a", "#4cc9f0", "#9b5de5", "#06d6a0", "#ff595e", "#f15bb5", "#ffd60a"].forEach((c, i) => {
+      const bl = new THREE.Mesh(new THREE.SphereGeometry(9, 10, 8), L(c)); bl.scale.set(1, 1.2, 1);
+      const x = (i < 4 ? -1 : 1) * (95 + (i % 4) * 9), y = 80 + (i % 2) * 16; bl.position.set(x, y, 100); g.add(bl); g.userData.balloons.push([bl, y]);
+      const str = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, y - 40, 3), new THREE.MeshBasicMaterial({ color: "#888" })); str.position.set(x, (y + 40) / 2, 100); g.add(str);
     });
-    g.rotation.y = Math.PI; // door faces up the street toward her
+    return g;   // front (+z) faces up the street, toward her
+  }
+
+  // Main Ave dressing: street lamps, string lights across the road, planter trees, a center line
+  function makeStreet(w) {
+    const g = new THREE.Group();
+    const [z0, z1] = w.town;
+    const pole = new THREE.MeshLambertMaterial({ color: "#2b2d42" }), lampM = new THREE.MeshBasicMaterial({ color: "#ffe8a3" });
+    const bulbs = ["#ff595e", "#ffca3a", "#8ac926", "#1982c4", "#ff70a6"].map((c) => new THREE.MeshBasicMaterial({ color: c }));
+    const dash = new THREE.MeshBasicMaterial({ color: "#ffd60a" }), cross = new THREE.MeshBasicMaterial({ color: "#f1f1f1" });
+    for (let z = z0 + 500; z < z1 - 200; z += 120) {
+      const c = w.cx(z), y0 = w.ground(c, z);
+      const d = new THREE.Mesh(new THREE.BoxGeometry(3, 0.6, 30), dash); d.position.set(c, y0 + 0.8, -z); g.add(d);
+    }
+    for (let z = z0 + 700, i = 0; z < z1 - 300; z += 380, i++) {
+      const c = w.cx(z);
+      for (const sx of [-1, 1]) {
+        const x = c + sx * 92, y = w.ground(x, z);
+        const p = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, 70, 6), pole); p.position.set(x, y + 35, -z); g.add(p);
+        const l = new THREE.Mesh(new THREE.SphereGeometry(5, 8, 6), lampM); l.position.set(x - sx * 6, y + 70, -z); g.add(l);
+        // planter tree
+        const tz = z + 190, tx = c + sx * 88, ty = w.ground(tx, tz);
+        const pot = new THREE.Mesh(new THREE.BoxGeometry(14, 8, 14), new THREE.MeshLambertMaterial({ color: "#8d6e63" })); pot.position.set(tx, ty + 4, -tz); g.add(pot);
+        const crown = new THREE.Mesh(new THREE.SphereGeometry(13, 8, 6), new THREE.MeshLambertMaterial({ color: i % 2 ? "#e9a23b" : "#d4a017" })); crown.position.set(tx, ty + 30, -tz); g.add(crown);  // golden fall trees
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, 20, 5), new THREE.MeshLambertMaterial({ color: "#5c4033" })); trunk.position.set(tx, ty + 16, -tz); g.add(trunk);
+      }
+      // string lights across the street
+      for (let k = 0; k <= 12; k++) {
+        const u = k / 12, x = c - 92 + 184 * u, sag = 14 * Math.sin(Math.PI * u);
+        const b = new THREE.Mesh(new THREE.SphereGeometry(2.2, 6, 4), bulbs[(k + i) % bulbs.length]); b.position.set(x, w.ground(c, z) + 66 - sag, -z); g.add(b);
+      }
+      if (i % 3 === 1) for (let k = -3; k <= 3; k++) { const s = new THREE.Mesh(new THREE.BoxGeometry(8, 0.6, 26), cross); s.position.set(c + k * 18, w.ground(c, z + 60) + 0.8, -(z + 60)); g.add(s); }   // crosswalk
+    }
     return g;
   }
 
@@ -615,7 +680,7 @@ const Ski3D = (() => {
       } else if (o.type === "building") {
         m = makeBuilding(o); m.position.set(o.x, w.ground(o.x, o.z), -o.z); m.rotation.y = o.side > 0 ? -Math.PI / 2 : Math.PI / 2;
       } else if (o.type === "house") {
-        m = makeHouse(o); m.position.set(o.x, w.ground(o.x, o.z), -o.z);
+        m = makeHouse(o); m.position.set(o.x, w.ground(o.x, o.z), -o.z); dyn.house = m;
       } else if (o.type === "fan") {
         // a penguin fan holding up a sign
         m = new THREE.Group();
@@ -642,6 +707,7 @@ const Ski3D = (() => {
     }
     for (const r of s.rivals || []) { const m = makeBiker(r.color, true); const lbl = textSprite(r.name, "#f1e3c8", 9, "#7b1e3a"); lbl.position.set(0, 68, 0); m.add(lbl); scene.add(m); dyn.rivals.push([r, m]); }
     dyn.chute = makeChute(); dyn.chute.visible = false; scene.add(dyn.chute);
+    if (w.town) { const st = makeStreet(w); scene.add(st); }
     trails = makePoints(360); trails.userData = { i: 0, p: [] }; scene.add(trails);
     for (let i = 0; i < 360; i++) trails.userData.p.push({ life: 0 });
     dyn.chad = makeSled(true); dyn.chad.visible = false; scene.add(dyn.chad);
@@ -848,6 +914,7 @@ const Ski3D = (() => {
       m.rotation.set(r.crash ? -r.crashT * 10 : 0, -(r.heading || 0), -(r.lean || 0), "YXZ");
       poseBike(m.userData.rig, r, dt, r.v || 300);
     }
+    if (dyn.house) { const u = dyn.house.userData; u.balloons.forEach(([b, y], i) => { b.position.y = y + Math.sin(s.t * 2 + i) * 4; }); u.momArm.rotation.z = 0.6 + Math.sin(s.t * 8) * 0.5; }
     dyn.fans.forEach((m, i) => { m.children[2].position.y = 42 + Math.abs(Math.sin(s.t * 6 + i)) * 8; });   // fans bounce their signs
     dyn.chute.visible = !!s.chute;
     if (s.chute) {

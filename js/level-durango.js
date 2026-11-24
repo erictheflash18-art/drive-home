@@ -629,7 +629,7 @@ const DurangoLevel = (() => {
       use3D = false;
       try {
         if (typeof THREE !== "undefined" && Ski3D.init($("stage"))) {
-          Ski3D.build({ s, ground, cx, HALF, onIce: () => false, pitch, chutes: () => [], edge: edgeScenery(), paint, theme: { desert: true }, rider: "bike" });
+          Ski3D.build({ s, ground, cx, HALF, onIce: () => false, pitch, chutes: () => [], edge: edgeScenery(), paint, theme: { desert: true }, rider: "bike", town: [TOWN, FINISH + 300] });
           Ski3D.show(true); use3D = true;
         }
       } catch (e) { console.error(e); use3D = false; Ski3D.show(false); }
