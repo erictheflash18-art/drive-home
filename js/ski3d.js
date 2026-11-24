@@ -10,7 +10,7 @@ const Ski3D = (() => {
   let world, lastT = 0, camY = null, camLX = 0, camYaw = 0, originKey = "";
   const NX = 72, NZ = 150;
   // grid offsets: ~25 units apart near her, stretching to ±2900 sideways and 3800 ahead
-  const XOFF = Array.from({ length: NX + 1 }, (_, i) => { const u = i / NX * 2 - 1; return Math.sign(u) * (Math.abs(u) * 900 + Math.pow(Math.abs(u), 3) * 2000); });
+  const XOFF = Array.from({ length: NX + 1 }, (_, i) => { const u = i / NX * 2 - 1; return Math.sign(u) * (Math.abs(u) * 600 + Math.pow(Math.abs(u), 3) * 2300); });
   const ZOFF = Array.from({ length: NZ + 1 }, (_, i) => { const v = i / NZ; return -560 + v * 1900 + Math.pow(v, 3) * 2460; });
   const MAX_TREES = 1500, MAX_ROCKS = 500, MAX_PILLOWS = 80;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);

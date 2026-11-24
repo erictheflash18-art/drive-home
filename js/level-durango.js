@@ -12,12 +12,8 @@ const DurangoLevel = (() => {
   const FREE = [0, 12000];
   const RACE_START = 12500, RACE_FINISH = 42000;
   const GATES = Array.from({ length: 11 }, (_, i) => 13600 + i * 1600);
-  const ROCK_GARDEN = [17000, 19000];
-  const BERMS = [21000, 23400];
-  const CREEK = 25200;
   const CLIFF_W = 30500, FLY_END = 37500, TOWN = 37500;
-  const DROP = 6000;               // the wooden drop in the free-ride zone
-  const GIFTS = [[3200, -320], [7000, 330], [10600, -260]];
+  const GIFTS = [2600, 7400, 10800];
   const SKIER_R = 16;
 
   let s;
@@ -26,20 +22,32 @@ const DurangoLevel = (() => {
   const within = (z, [a, b]) => z > a && z < b;
   const smooth = (e0, e1, v) => { const u = clamp((v - e0) / (e1 - e0), 0, 1); return u * u * (3 - 2 * u); };
 
-  // the trail winds down the hill, then runs straight down Main Ave
-  function cxRaw(z) { return 150 * Math.sin(z / 2100) + 60 * Math.sin(z / 730 + 2); }
-  function cx(z) { const t = smooth(TOWN - 1500, TOWN, z); return cxRaw(z) * (1 - t) + cxRaw(TOWN) * t; }
+  // ---------- The trail ----------
+  // A winding singletrack cut into a steep mountainside: big S-turns with banked berms, table-top
+  // jumps on the straights, rollers, steep chutes and mellow stretches. Straightens out for the
+  // wingsuit cliff and runs straight down Main Ave in town.
+  const TW = 76;                    // trail width
+  function cxRaw(z) {
+    const A = 300 + 260 * Math.pow(Math.sin(z / 3100 + 0.6), 2);
+    const ph = z / 430 + 0.8 * Math.sin(z / 2700);
+    return A * Math.sin(ph) * smooth(0, 1400, z) + 140 * Math.sin(z / 1900);
+  }
+  function cx(z) {
+    const t = smooth(CLIFF_W - 1600, CLIFF_W - 400, z);
+    return cxRaw(z) * (1 - t) + cxRaw(CLIFF_W - 400) * t;   // straight run-in to the cliff, then straight through the valley and town
+  }
+  const dcx = (z) => (cx(z + 6) - cx(z - 6)) / 12;                 // trail slope (dx/dz)
+  const trailDir = (z) => Math.atan(dcx(z));
+  const curv = (z) => (cx(z + 24) - 2 * cx(z) + cx(z - 24)) / 576;  // dx²/dz²
+  // perpendicular distance from the trail centerline (positive = +x side)
+  const perp = (x, z) => (x - cx(z)) * Math.cos(trailDir(z));
 
-  const KICKERS = [
-    [4200, 0, 120, 40, 90], [4550, 0, 120, 40, 90], [4900, 0, 120, 40, 90], [5250, 0, 120, 40, 90], // dirt jump line
-    [8500, 150, 170, 62, 115], [9600, -200, 170, 62, 115],
-    [15200, 0, 170, 55, 110], [20000, 0, 170, 55, 110], [27400, 0, 170, 55, 110],
-  ].map(([z, dx, w, h, len]) => ({ z, x: cx(z) + dx, w, h, len }));
-
+  // pitch: steep chutes and mellow stretches
   function pitch(z) {
     if (z > TOWN) return 0.035;
     if (z > TOWN - 600) return 0.2 - 0.165 * smooth(TOWN - 600, TOWN, z);
-    return 0.2;
+    if (z > CLIFF_W - 400) return 0.2;
+    return 0.2 + 0.1 * Math.sin(z / 1700 + 1) + 0.05 * Math.sin(z / 610);
   }
   const BASE = (() => {
     const a = new Float32Array(Math.ceil((FINISH + 6000) / 20) + 2);
@@ -51,61 +59,74 @@ const DurangoLevel = (() => {
     const f = (z + 1000) / 20, i = clamp(Math.floor(f), 0, BASE.length - 2), u = clamp(f - i, 0, 1);
     return BASE[i] + (BASE[i + 1] - BASE[i]) * u + (z < -1000 ? -0.2 * (z + 1000) : 0);
   }
-  const bermX = (z) => cx(z) + 170 * Math.sin((z - BERMS[0]) / 500);
+
+  // table-top jumps on the straighter bits of trail (+ the dirt-jump line near the top)
+  const TABLES = (() => {
+    const out = [];
+    for (const z of [3300, 3620, 3940]) out.push({ z, h: 30, up: 60, deck: 60, down: 90 });   // dirt jump line
+    let last = 4500;
+    for (let z = 4600; z < CLIFF_W - 1800; z += 40) {
+      if (z - last < 1100 || Math.abs(curv(z)) > 0.0009 || Math.abs(curv(z + 200)) > 0.0012) continue;
+      out.push({ z, h: 40, up: 75, deck: 80, down: 110 }); last = z;
+    }
+    return out;
+  })();
+  const sideSlope = (z) => 0.5 * Math.sin(z / 4300 + 1.2);   // which side of the mountain is uphill
 
   function ground(x, z) {
-    const out = Math.max(0, Math.abs(x - cx(z)) - (HALF - 40));
+    const d = perp(x, z), ad = Math.abs(d);
     const town = smooth(TOWN - 300, TOWN + 200, z);
-    const roll = (12 * Math.sin(x / 130 + z / 460) + 7 * Math.sin(x / 57 - z / 230) + 5 * Math.sin(z / 170 + x / 300)) * (1 - town);
-    const rv = 1 - Math.abs(Math.sin(x / 210 + 0.6 * Math.sin(z / 700)));
-    const ridge = 16 * rv * rv * (1 - town);
-    // flat road in town
-    const road = town * smooth(150, 90, Math.abs(x - cx(z)));
-    let berm = 0, bf = 0;
-    if (z > BERMS[0] && z < BERMS[1]) {
-      bf = smooth(BERMS[0], BERMS[0] + 400, z) * smooth(BERMS[1], BERMS[1] - 400, z);
-      const d = Math.min(Math.abs(x - bermX(z)), 240);
-      berm = bf * d * d * 0.0022;
+    const onTrail = smooth(TW / 2 + 30, TW / 2, ad);          // 1 on the trail bench
+    // the mountainside: uphill on one side, dropping away on the other, with lumpy forest floor
+    const dOut = Math.sign(d) * Math.max(0, ad - TW / 2 - 18);
+    const side = sideSlope(z) * (1 - town);
+    const lumps = (10 * Math.sin(x / 70 + z / 90) + 8 * Math.sin(x / 33 - z / 55) + 14 * Math.sin(x / 160 + z / 230)) * (1 - onTrail) * (1 - town) * Math.min(1, Math.abs(dOut) / 60);
+    const hill = side * dOut + Math.min(1, Math.abs(dOut) / 300) * 40 * Math.sin(x / 260 + z / 400) * (1 - town) + lumps;
+    // berms: the trail banks into every turn (steeper the tighter it turns)
+    let berm = 0;
+    if (z < CLIFF_W - 300) {
+      const k = curv(z), bank = clamp(Math.abs(k) * 420 * 420 / G * 1.1, 0, 0.85);
+      const outside = -Math.sign(k);                          // the outside of the turn is raised
+      const dd = clamp(d * outside, -TW / 2, TW / 2 + 22);
+      berm = bank * (dd + TW / 2) * smooth(TW / 2 + 50, TW / 2 + 22, ad + (d * outside > 0 ? 0 : 0));
+      berm -= bank * TW / 2 * onTrail * 0;                     // (inside edge stays at trail level)
     }
-    let kick = 0;
-    for (const k of KICKERS) {
-      const dz = z - k.z;
-      if (dz < -k.len || dz > 70) continue;
-      const lat = smooth(k.w / 2 + 55, k.w / 2 - 10, Math.abs(x - k.x));
+    // table-tops
+    let table = 0;
+    for (const j of TABLES) {
+      const dz = z - j.z;
+      if (dz < -j.up || dz > j.deck + j.down) continue;
+      const lat = smooth(TW / 2 + 26, TW / 2 - 4, ad);
       if (lat <= 0) continue;
-      kick += lat * (dz <= 0 ? k.h * Math.pow((dz + k.len) / k.len, 1.6) : k.h * (1 - smooth(0, 70, dz)));
+      let h;
+      if (dz < 0) h = j.h * Math.pow((dz + j.up) / j.up, 1.5);
+      else if (dz < j.deck) h = j.h;
+      else h = j.h * (1 - smooth(j.deck, j.deck + j.down, dz));
+      table += h * lat;
     }
-    // the wooden drop: a sharp step on the trail, a gentle roll-down everywhere else
-    let drop = 0;
-    if (z > DROP - 20) { const d = Math.abs(x - cx(DROP)); const w = 12 + smooth(80, 160, d) * 300; drop = -70 * smooth(DROP, DROP + w, z); }
+    // rollers along the trail
+    const roll = 5 * Math.sin(z / 47) * onTrail * (1 - town) * (z < CLIFF_W - 400 ? 1 : 0);
     // the wingsuit cliff: a huge drop across everything
-    let cliff = 0;
-    if (z > CLIFF_W - 20) cliff = -280 * smooth(CLIFF_W, CLIFF_W + 24, z);
-    let creek = 0;
-    if (Math.abs(z - CREEK) < 160) {
-      const br = smooth(75, 50, Math.abs(x - cx(CREEK)));
-      creek = -26 * Math.exp(-Math.pow((z - CREEK) / 24, 2)) * (1 - br);
-      const dz = z - (CREEK - 55);
-      if (dz > -70 && dz < 12) creek += (1 - br) * (dz <= 0 ? 22 * Math.pow((dz + 70) / 70, 1.6) : 22 * (1 - dz / 12));
-    }
-    const dune = Math.min(1, out / 140) * (40 * Math.pow(Math.sin(x / 150 + z / 330), 2) + 22 * Math.sin(x / 61 + z / 170));
-    const bumps = (roll + ridge) * (1 - 0.75 * bf) * (1 - road);
-    return base(z) + bumps + berm + kick + drop + cliff + creek + out * 0.35 + out * out * 0.0014 + dune;
+    const cliff = z > CLIFF_W - 20 ? -280 * smooth(CLIFF_W, CLIFF_W + 24, z) : 0;
+    // valley below the cliff: gentle rolling
+    const valley = z > CLIFF_W ? (1 - town) * (16 * Math.sin(x / 140 + z / 300) + 10 * Math.sin(z / 120 - x / 90)) : 0;
+    return base(z) + hill + berm + table + roll + cliff + valley;
   }
   const gradX = (x, z) => (ground(x + 3, z) - ground(x - 3, z)) / 6;
   const gradZ = (x, z) => (ground(x, z + 3) - ground(x, z - 3)) / 6;
 
-  // ground colors: golden grass, a red-dirt trail, Main Ave asphalt and sidewalks
-  const C = { grass: [0.78, 0.7, 0.5], grass2: [0.62, 0.6, 0.42], trail: [0.6, 0.4, 0.27], road: [0.34, 0.35, 0.38], walk: [0.78, 0.76, 0.72], tmp: [0, 0, 0] };
+  // ground colors: forest floor + golden meadow, a red-dirt trail, Main Ave asphalt
+  const C = { forest: [0.45, 0.5, 0.32], meadow: [0.74, 0.66, 0.44], trail: [0.62, 0.42, 0.28], berm: [0.55, 0.36, 0.24], road: [0.34, 0.35, 0.38], walk: [0.78, 0.76, 0.72], tmp: [0, 0, 0] };
   function paint(x, z) {
-    const d = Math.abs(x - cx(z));
+    const ad = Math.abs(x - cx(z));
     if (z > TOWN - 200) {
-      if (d < 72) return C.road;
-      if (d < 100) return C.walk;
+      if (ad < 72) return C.road;
+      if (ad < 100) return C.walk;
     }
-    const tr = z < CLIFF_W ? smooth(46, 30, d) : 0;
-    const g = 0.5 + 0.5 * Math.sin(x / 90 + z / 140) * Math.sin(z / 260 - x / 180);
-    for (let i = 0; i < 3; i++) C.tmp[i] = (C.grass[i] * g + C.grass2[i] * (1 - g)) * (1 - tr) + C.trail[i] * tr;
+    const pd = Math.abs(perp(x, z));
+    const tr = z < CLIFF_W ? smooth(TW / 2 + 26, TW / 2 + 4, pd) : 0;
+    const g = clamp(0.5 + 0.6 * Math.sin(x / 300 + z / 500) * Math.sin(z / 900 - x / 400), 0, 1);
+    for (let i = 0; i < 3; i++) C.tmp[i] = (C.forest[i] * (1 - g) + C.meadow[i] * g) * (1 - tr) + C.trail[i] * tr;
     return C.tmp;
   }
 
@@ -113,16 +134,19 @@ const DurangoLevel = (() => {
   let flyY0 = 0, flyY1 = 0;
   function pathY(z) { const u = clamp((z - CLIFF_W) / (FLY_END - CLIFF_W), 0, 1); return flyY0 + (flyY1 - flyY0) * u + 50 * Math.sin(Math.PI * u); }
 
+  // the forest: lots of pines (and some golden aspens) beside the trail, thinning far away
   function edgeScenery() {
     const e = [];
-    for (let z = -300; z < FINISH + 3000; z += 70) {
-      if (z > TOWN - 400) continue;
-      for (const side of [-1, 1]) for (let k = 0; k < 3; k++) {
-        if (hash(z + k * 17, side + 3) > 0.62 - k * 0.12) continue;
-        const off = HALF + 25 + k * 120 + hash(z, side * 7 + k) * 110;
-        e.push({ type: "tree", z: z + hash(z, k) * 50, x: cx(z) + side * off, sz: 0.9 + hash(z, k + 9) * 0.7 });
+    for (let z = -300; z < TOWN - 300; z += 34) {
+      const dir = trailDir(z), sec = 1 / Math.cos(dir);
+      for (const side of [-1, 1]) for (let k = 0; k < 4; k++) {
+        if (hash(z + k * 13, side + 3) > 0.55 - k * 0.08) continue;
+        const off = (TW / 2 + 170 + k * 110 + hash(z, side * 7 + k) * 100) * sec;
+        e.push({ type: "tree", z: z + hash(z, k) * 30, x: cx(z) + side * off, sz: 0.9 + hash(z, k + 9) * 0.8 });
       }
-      for (const side of [-1, 1]) if (hash(z, side + 21) < 0.08) e.push({ type: "boulder", z, x: cx(z) + side * (HALF + 60 + hash(z, 5) * 260), r: 40 + hash(z, 8) * 70 });
+    }
+    for (let z = CLIFF_W + 200; z < TOWN - 600; z += 60) for (const side of [-1, 1]) {   // the valley below the cliff
+      if (hash(z, side + 40) < 0.5) e.push({ type: "tree", z, x: cx(z) + side * (200 + hash(z, side + 41) * 900), sz: 1 + hash(z, 3) * 0.6 });
     }
     return e;
   }
@@ -138,9 +162,9 @@ const DurangoLevel = (() => {
     };
     s.x = cx(0); s.camX = s.x; s.y = ground(s.x, 0);
     s.rivals = [
-      { name: "CHAD", color: "#7b1e3a", lane: -90, gap: 70, on: false },
-      { name: "BRAD", color: "#3a0ca3", lane: 95, gap: -30, on: false },
-      { name: "TRENT", color: "#5f0f40", lane: 170, gap: 130, on: false },
+      { name: "CHAD", color: "#7b1e3a", lane: -22, gap: 70, on: false },
+      { name: "BRAD", color: "#3a0ca3", lane: 22, gap: -40, on: false },
+      { name: "TRENT", color: "#5f0f40", lane: 0, gap: 140, on: false },
     ];
     flyY0 = ground(cx(CLIFF_W), CLIFF_W - 4); flyY1 = ground(cx(FLY_END), FLY_END);
     Confetti.bits = [];
@@ -152,42 +176,31 @@ const DurangoLevel = (() => {
     const add = (o) => s.objs.push(o);
     const across = (z, k) => cx(z) + (hash(z, k) - 0.5) * (HALF * 2 - 80);
     const nearTrail = (o) => Math.abs(o.x - cx(o.z)) < 70;
-    add({ type: "sign", z: 300, x: cx(300) + 170, text: L.startSign, color: "#7b4a1f" });
-    // trees: scattered over the hill, never on the trail
-    for (let z = 700; z < CLIFF_W - 300; z += 90) {
-      for (let k = 0; k < 3; k++) if (hash(z, 4 + k) < 0.45) {
-        const o = { type: "tree", z: z + hash(z, k) * 60, x: across(z, 20 + k), sz: 0.8 + hash(z, 6 + k) * 0.6 };
-        if (!nearTrail(o)) add(o);
-      }
+    const sec = (z) => 1 / Math.cos(trailDir(z));
+    add({ type: "sign", z: 300, x: cx(300) + 110, text: L.startSign, color: "#7b4a1f" });
+    // trees right beside the trail (these you can hit if you leave it)
+    for (let z = 600; z < CLIFF_W - 300; z += 46) for (const side of [-1, 1]) {
+      if (hash(z, side + 50) > 0.62) continue;
+      const off = (TW / 2 + 70 + hash(z, side + 51) * 120) * sec(z);
+      add({ type: "tree", z, x: cx(z) + side * off, sz: 0.85 + hash(z, side + 52) * 0.6 });
     }
-    // rocks: some everywhere, a real rock garden on the race course
-    for (let z = 1500; z < CLIFF_W - 300; z += 120) {
-      const garden = within(z, ROCK_GARDEN);
-      for (let k = 0; k < (garden ? 4 : 2); k++) {
-        if (hash(z, 7 + k * 3) > (garden ? 0.7 : 0.18)) continue;
-        const x = garden ? cx(z) + (hash(z, 31 + k) - 0.5) * 260 : across(z, 30 + k);
-        add({ type: "rock", z: z + k * 30, x, r: 14 + hash(z, 9 + k) * 12 });
-      }
-    }
-    // kickers (+ flowers hanging in the air past each lip)
-    KICKERS.forEach((k, i) => {
-      add({ type: "kicker", z: k.z, x: k.x, w: k.w });
-      for (let j = 0; j < 2; j++) add({ type: "flower", z: k.z + 110 + j * 120, x: k.x, h: [95, 130][j], hue: (i + j) % 3 });
+    // table-tops (+ flowers hanging over each gap)
+    TABLES.forEach((j, i) => {
+      add({ type: "kicker", z: j.z, x: cx(j.z), w: TW * sec(j.z) + 10 });
+      add({ type: "flower", z: j.z + j.deck * 0.5, x: cx(j.z + j.deck * 0.5), h: 60, hue: i % 3 });
+      add({ type: "flower", z: j.z + j.deck + 40, x: cx(j.z + j.deck + 40), h: 55, hue: (i + 1) % 3 });
     });
-    add({ type: "deck", z: DROP, x: cx(DROP), w: 140 });
-    add({ type: "sign", z: DROP - 500, x: cx(DROP) + 150, text: L.dropSign, color: "#a47148" });
-    add({ type: "sign", z: KICKERS[0].z - 500, x: cx(KICKERS[0].z) - 150, text: L.jumpSign, color: "#a47148" });
-    // flowers along the trail
-    for (let z = 1000; z < CLIFF_W - 400; z += 600 + Math.floor(hash(z, 11) * 300)) {
-      const x = cx(z) + (hash(z, 12) - 0.5) * 300;
-      for (let i = 0; i < 3; i++) add({ type: "flower", z: z + i * 60, x: x + Math.sin(i) * 12, h: 0, hue: (Math.floor(z / 10) + i) % 3 });
+    add({ type: "sign", z: TABLES[0].z - 400, x: cx(TABLES[0].z - 400) + 100 * sec(TABLES[0].z - 400), text: L.jumpSign, color: "#a47148" });
+    // flowers along the trail, sitting in the line
+    for (let z = 900; z < CLIFF_W - 400; z += 380 + Math.floor(hash(z, 11) * 200)) {
+      for (let i = 0; i < 3; i++) { const zz = z + i * 50; add({ type: "flower", z: zz, x: cx(zz) + (hash(z, 12) - 0.5) * 30, h: 0, hue: (Math.floor(z / 10) + i) % 3 }); }
     }
     // the gifts (memories) glowing out on the hill
-    GIFTS.forEach(([z, dx], n) => add({ type: "gift", z, x: cx(z) + dx, n }));
+    GIFTS.forEach((z, n) => add({ type: "gift", z, x: cx(z), n }));
     // the race
-    add({ type: "gate", z: RACE_START, x: cx(RACE_START), w: 220, label: L.raceStartGate, color: "#e63946" });
-    GATES.forEach((z, i) => add({ type: "gate", z, x: cx(z), w: 200, label: "CHECKPOINT " + (i + 1), color: "#ff6b00", n: i }));
-    add({ type: "sign", z: CLIFF_W - 600, x: cx(CLIFF_W) + 170, text: L.cliffSign, color: "#e63946" });
+    add({ type: "gate", z: RACE_START, x: cx(RACE_START), w: TW * sec(RACE_START) + 60, label: L.raceStartGate, color: "#e63946" });
+    GATES.forEach((z, i) => add({ type: "gate", z, x: cx(z), w: TW * sec(z) + 50, label: "CHECKPOINT " + (i + 1), color: "#ff6b00", n: i }));
+    add({ type: "sign", z: CLIFF_W - 600, x: cx(CLIFF_W - 600) + 110, text: L.cliffSign, color: "#e63946" });
     // wingsuit rings down the valley
     for (let z = CLIFF_W + 700, i = 0; z < FLY_END - 500; z += 600, i++) add({ type: "ring", z, x: cx(z) + 160 * Math.sin(i * 1.3), y: pathY(z), n: i });
     // town: Main Ave
@@ -238,47 +251,69 @@ const DurangoLevel = (() => {
   }
 
   // ---------- Bike physics (same model as the skis: gravity, grip, real airs) ----------
-  function minSpeed(z) { return z > TOWN ? 300 : 330 + 90 * clamp(z / CLIFF_W, 0, 1); }
-
+  // ---------- Bike physics ----------
+  // Gravity along the real slope, air drag + rolling resistance, pedaling on the flats, and
+  // tire grip that limits how hard you can turn (berms add grip). The bike naturally follows
+  // the trail when you're not steering; steering picks your line.
   function physics(dt) {
     const steer = s.state === "ride" ? Engine.steer() : 0;
-    const turnRate = s.air ? (s.airT < 0.28 ? 2.5 : 10) : 2.6;
     const prevHeading = s.heading;
-    if (steer) { s.heading += steer * turnRate * dt; if (s.air) s.spinAcc += steer * turnRate * dt; }
-    else if (!s.air) s.heading -= s.heading * Math.min(1, 1.6 * dt);
-    else if (s.airT > 0.28) {
-      const dir = Math.atan2(s.vx, s.v), k = Math.round((s.heading - dir) / (Math.PI * 2));
-      const step = clamp(dir + k * Math.PI * 2 - s.heading, -8 * dt, 8 * dt);
-      s.heading += step; s.spinAcc += step;
+    let u = s.vx * Math.sin(s.heading) + s.v * Math.cos(s.heading);
+    const d = perp(s.x, s.z), onTrail = Math.abs(d) < TW / 2 + 10;
+    if (s.air) {
+      // in the air left/right spins (slowly at first so bumps don't spin you out)
+      const rate = s.airT < 0.28 ? 2.5 : 10;
+      if (steer) { s.heading += steer * rate * dt; s.spinAcc += steer * rate * dt; }
+      else if (s.airT > 0.28) {
+        const dir = Math.atan2(s.vx, s.v), k = Math.round((s.heading - dir) / (Math.PI * 2));
+        const step = clamp(dir + k * Math.PI * 2 - s.heading, -8 * dt, 8 * dt);
+        s.heading += step; s.spinAcc += step;
+      }
+    } else {
+      // how hard can she turn? grip (more on a berm, less off the trail) / speed
+      const bank = Math.abs(gradX(s.x, s.z) * Math.cos(s.heading) - gradZ(s.x, s.z) * Math.sin(s.heading));
+      const grip = (onTrail ? 1.0 : 0.6) * G + G * Math.min(0.8, bank);
+      const maxRate = clamp(grip / Math.max(80, u), 0.8, 3.2);
+      // follow the trail on your own: aim along it, and drift back toward the middle
+      const along = trailDir(s.z + Math.max(60, u * 0.35));
+      const back = clamp(-d / 260, -0.5, 0.5);
+      const auto = (along + back) - s.heading;
+      // steering adds to the trail-following (so holding into a turn tightens it, never fights it)
+      const want = clamp(auto * 2.2 * (steer ? 0.4 : 1) + steer * maxRate, -maxRate, maxRate);
+      s.turnRate = (s.turnRate || 0) + (want - (s.turnRate || 0)) * Math.min(1, dt * 10);
+      s.heading += s.turnRate * dt;
+      s.heading = clamp(s.heading, -1.4, 1.4);
     }
-    if (!s.air) s.heading = clamp(s.heading, -1.3, 1.3);
     const sn = Math.sin(s.heading), cs = Math.cos(s.heading);
-    let u = s.vx * sn + s.v * cs, w = s.vx * cs - s.v * sn;
+    u = s.vx * sn + s.v * cs;
+    let w = s.vx * cs - s.v * sn;
     if (!s.air || s.h < 8) {
       const ax = -G * gradX(s.x, s.z), az = -G * gradZ(s.x, s.z);
       const ah = ax * sn + az * cs;
-      u += ((ah < 0 ? ah * 0.3 : ah) - DRAG * u * Math.abs(u)) * dt;
+      const roll = onTrail ? 18 : 160;                          // rolling resistance (dirt vs forest floor)
+      u += (ah - 0.0011 * u * Math.abs(u) - roll * Math.sign(u)) * dt;
+      if (s.state === "ride" && u < 250 && s.z < TOWN) u += 220 * dt;   // she pedals
+      if (s.state === "ride" && s.z > TOWN && u < 300) u += 260 * dt;    // and sprints Main Ave
       if (s.boostT > 0) u += 260 * dt;
-      if (s.state !== "arrive") u = clamp(u, minSpeed(s.z), minSpeed(s.z) + 170);
-      w += (ax * cs - az * sn) * 0.25 * dt;
-      w *= Math.exp(-9 * dt);                                  // tires grip
-      if (s.state === "tumble") w *= 1 - 3 * dt;
+      u = clamp(u, 60, 640);
+      w += (ax * cs - az * sn) * 0.6 * dt;                      // a berm's slope pushes her into the turn
+      w *= Math.exp(-(onTrail ? 10 : 6) * dt);                  // tires grip
+      if (s.state === "tumble") { u *= 1 - 1.2 * dt; w *= 1 - 3 * dt; }
       if (s.state === "arrive") { u *= 1 - 2.2 * dt; w *= 1 - 4 * dt; if (s.z > FINISH - 60) u = Math.min(u, 8); }
       s.vx = u * sn + w * cs; s.v = u * cs - w * sn;
     }
     if (s.boostT > 0) s.boostT -= dt;
     s.v = Math.max(s.v, s.state === "arrive" ? 0 : 25);
     s.x += s.vx * dt; s.z += s.v * dt;
-    const off = s.x - cx(s.z);
-    const wall = s.z > TOWN ? 110 : HALF + 160;              // town: stay on Main Ave
-    if (Math.abs(off) > wall) { s.x = cx(s.z) + Math.sign(off) * wall; s.vx *= -0.2; s.heading *= 0.5; }
+    // can't wander off into the mountain forever
+    const d2 = perp(s.x, s.z), wall = s.z > TOWN ? 100 : 260;
+    if (Math.abs(d2) > wall) { s.x = cx(s.z) + Math.sign(d2) * wall / Math.cos(trailDir(s.z)); s.vx *= 0.3; }
     const gNew = ground(s.x, s.z);
     if (!s.air) {
       const gv = (gNew - s.y) / dt;
       if (s.state === "ride" && gv < s.vy - G * dt * 1.6 - 30) {
         s.air = true; s.airT = 0; s.bigAir = false; s.spinAcc = 0;
-        if (KICKERS.some((k) => Math.abs(s.z - k.z) < 50 && Math.abs(s.x - k.x) < k.w / 2 + 20)) { s.vy += 80; Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700); }
-        if (Math.abs(s.z - DROP) < 50 && Math.abs(s.x - cx(DROP)) < 90) { s.vy += 90; Engine.toast(pick(L.dropSend), "good"); }
+        if (TABLES.some((j) => Math.abs(s.z - j.z) < 40) && onTrail) { s.vy += 60; Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700); }
         s.vy -= G_AIR * dt; s.y += s.vy * dt;
       } else { s.vy = gv; s.y = gNew; }
     } else {
@@ -288,10 +323,11 @@ const DurangoLevel = (() => {
       if (s.y <= gNew) { const vyi = s.vy; s.y = gNew; s.air = false; s.vy = 0; land(vyi); }
     }
     s.h = Math.max(0, s.y - gNew);
-    const turning = (s.heading - prevHeading) / Math.max(dt, 1e-3);
-    s.lean += (clamp(turning * Math.max(u, 60) / 700, -1, 1) * 0.5 - s.lean) * Math.min(1, dt * 7);
+    // a bike leans into the turn: tan(lean) = v·ω / g
+    const omega = (s.heading - prevHeading) / Math.max(dt, 1e-3);
+    const leanT = s.air ? 0 : clamp(Math.atan(u * omega / G), -0.9, 0.9);
+    s.lean += (leanT - s.lean) * Math.min(1, dt * 8);
     s.comp = Math.max(0, s.comp - dt * 2.5);
-    // the wingsuit cliff
     if (s.state === "ride" && s.z > CLIFF_W - 4 && s.mode === "ride" && s.z < FLY_END) startFly();
   }
 
@@ -308,7 +344,7 @@ const DurangoLevel = (() => {
     const dir = Math.atan2(s.vx, s.v);
     let diff = s.heading - dir; diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     s.heading = dir + diff;
-    if (s.airT > 0.45 && Math.abs(diff) > 1.1) { s.heading = dir; crash(); Engine.toast(L.sideways, "bad"); return; }
+    if (s.airT > 0.45 && Math.abs(diff) > 1.6) { s.heading = dir; crash(); Engine.toast(L.sideways, "bad"); return; }
     const spins = Math.floor((Math.abs(s.spinAcc) + 0.7) / (Math.PI * 2));
     if (spins > 0) {
       s.spins += spins; s.flowers += 2 * spins;
@@ -362,13 +398,10 @@ const DurangoLevel = (() => {
     const z = s.z;
     const once = (k, cond, fn) => { if (!s.flags[k] && cond) { s.flags[k] = true; fn(); } };
     once("free", z > 400, () => Engine.toast(L.freeRide, "good"));
-    once("jumps", z > KICKERS[0].z - 600, () => Engine.toast(L.jumpLine));
-    once("drop", z > DROP - 500, () => Engine.toast(L.dropHint));
+    once("berms", z > 1500, () => Engine.toast(L.berms, "good"));
+    once("jumps", z > TABLES[0].z - 500, () => Engine.toast(L.jumpLine));
     once("raceSoon", z > RACE_START - 900, () => { Engine.toast(L.raceSoon, "bad"); for (const r of s.rivals) { r.on = true; r.z = s.z - 300 + r.gap; r.x = cx(r.z) + r.lane; r.v = s.v; } });
     once("go", z > RACE_START, () => { Engine.toast(L.raceGo, "bad"); Sfx.fanfare(); s.racing = true; });
-    once("rocks", z > ROCK_GARDEN[0] - 400, () => Engine.toast(L.rockGarden, "bad"));
-    once("berms", z > BERMS[0], () => Engine.toast(L.berms, "good"));
-    once("creek", z > CREEK - 900, () => Engine.toast(L.creek, "bad"));
     once("cliff", z > CLIFF_W - 900, () => Engine.toast(L.cliffWarn, "bad"));
     once("chadCrash", z > RACE_FINISH - 1600, () => {
       const c = s.rivals[0]; if (!c.crash) { c.crash = true; c.crashT = 0; Engine.toast(L.chadCrash, "good"); Engine.toast(pick(LINES.doesntLastLong)); }
@@ -410,11 +443,11 @@ const DurangoLevel = (() => {
         r.y = pathY(r.z) + 40 + i * 35 + 20 * Math.sin(r.t + i);   // fly a little above her, spread out
         r.x += (cx(r.z) + r.lane * 1.8 + 60 * Math.sin(r.t * 0.7 + i) - r.x) * Math.min(1, dt * 1.5);
       } else {
-        const tx = cx(r.z) + (r.z > TOWN ? r.lane * 0.4 : r.lane) + 40 * Math.sin(r.t * 0.9 + i);
-        const nx = r.x + (tx - r.x) * Math.min(1, dt * 1.5);
-        r.heading = clamp(Math.atan2(nx - r.x, Math.max(1, r.v * dt)), -0.8, 0.8);
-        r.lean = r.heading * 0.4;
-        r.x = nx;
+        const tx = cx(r.z) + (r.z > TOWN ? r.lane * 2 : r.lane) + 12 * Math.sin(r.t * 0.9 + i);
+        const nx = r.x + (tx - r.x) * Math.min(1, dt * 4);
+        const nh = clamp(Math.atan2(nx - r.x, Math.max(1, r.v * dt)), -1.3, 1.3);
+        r.lean = clamp(Math.atan(r.v * (nh - (r.heading || 0)) / Math.max(dt, 1e-3) / G), -0.8, 0.8) * 0.5 + (r.lean || 0) * 0.5;
+        r.heading = nh; r.x = nx;
       }
       // don't ride through her
       if (Math.abs(r.z - s.z) < 40 && Math.abs(r.x - s.x) < 44) r.x += Math.sign(r.x - s.x || 1) * 120 * dt;
@@ -431,14 +464,8 @@ const DurangoLevel = (() => {
       if (o.type === "tree" && hitZ && dx < 22 * o.sz + SKIER_R && s.h < 70) { o.got = true; hitTree(); }
       else if (o.type === "rock" && hitZ && dx < o.r + SKIER_R - 4 && s.h < o.r) { o.got = true; crash(); }
       else if (o.type === "flower" && Math.abs(o.z - s.z) < 26 && dx < (o.h ? 46 : 34) && (o.h ? s.air && s.h > 30 : s.h < 45)) { o.got = true; s.flowers++; Sfx.flower(); }
-      else if (o.type === "charm" && Math.abs(o.z - s.z) < 40 && dx < 60) { o.got = true; s.charm = true; Sfx.fanfare(); Confetti.burst(80, Engine.W); Engine.toast(L.gotCharm, "good"); }
-      else if (o.type === "gift" && Math.abs(o.z - s.z) < 40 && dx < 50) { o.got = true; s.gifts++; Sfx.fanfare(); showMemory(o.n); }
-    }
-    // the creek
-    if (prevZ < CREEK && s.z >= CREEK && s.h < 10 && Math.abs(s.x - cx(CREEK)) > 60) {
-      Sfx.splash(); Engine.shake = 5;
-      Engine.toast(pick(LINES.waterCold), "water");
-      s.shrinkT = 3.4; s.smallPending = true;
+      else if (o.type === "charm" && Math.abs(o.z - s.z) < 50 && dx < 70) { o.got = true; s.charm = true; Sfx.fanfare(); Confetti.burst(80, Engine.W); Engine.toast(L.gotCharm, "good"); }
+      else if (o.type === "gift" && Math.abs(o.z - s.z) < 50 && dx < 70) { o.got = true; s.gifts++; Sfx.fanfare(); showMemory(o.n); }
     }
   }
 
@@ -468,7 +495,7 @@ const DurangoLevel = (() => {
     for (const o of s.objs) {
       if ((o.type !== "gift" && o.type !== "charm") || o.got) continue;
       const ahead = o.z - s.z;
-      if (ahead > -10 && ahead < 450) o.x += (s.x - o.x) * Math.min(1, dt * (o.type === "charm" ? 3 : 1.6));
+      if (ahead > -10 && ahead < 450) o.x += (s.x - o.x) * Math.min(1, dt * (ahead < 200 ? 8 : 3));
       if (ahead < -80) { o.z = s.z + 900; o.x = clamp(s.x, cx(o.z) - 300, cx(o.z) + 300); if (o.type === "gift") Engine.toast(L.giftMissed); s.objs.sort((a, b) => a.z - b.z); }
     }
   }
