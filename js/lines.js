@@ -395,9 +395,9 @@ const LINES = {
     giftMissed: "You missed a gift. It's up ahead.",
     keepRiding: "Keep riding",
     gifts: [
-      "PLACEHOLDER: write gift 1 in the recorder.",
-      "PLACEHOLDER: write gift 2 in the recorder.",
-      "PLACEHOLDER: write gift 3 in the recorder.",
+      "Reese, this is it. The last leg home. Thank you for every mile, every adventure, and every time you said yes to something dumb I planned.",
+      "Reese, I love watching you ride. You are fearless on a bike, and somehow you are still smiling when you are covered in dirt.",
+      "Reese, I can't wait to be with you again. More rides, more powder days, more flowers. Happy birthday.",
     ],
     raceSoon: "ΣΤΓ at the start line. Chad brought his bros. It's a race.",
     raceStartGate: "RACE START",
@@ -434,7 +434,7 @@ const LINES = {
     finaleTitle: "HAPPY BIRTHDAY, REESE!",
     finaleSub: "You drove (and skied, and rafted, and biked) all the way home.",
     certButton: "🎁 Open your gift certificate",
-    note: "PLACEHOLDER: write the last note in the recorder.",
+    note: "Happy birthday, Reese. Thank you for playing all five days. Print your certificate, and I will trade you the real thing. I love you.",
     certificate: {
       title: "Gift Certificate",
       to: "For: Reese",
