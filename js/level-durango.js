@@ -63,11 +63,11 @@ const DurangoLevel = (() => {
   // table-top jumps on the straighter bits of trail (+ the dirt-jump line near the top)
   const TABLES = (() => {
     const out = [];
-    for (const z of [3300, 3620, 3940]) out.push({ z, h: 30, up: 60, deck: 60, down: 90 });   // dirt jump line
-    let last = 4500;
-    for (let z = 4600; z < CLIFF_W - 1800; z += 40) {
-      if (z - last < 1100 || Math.abs(curv(z)) > 0.0009 || Math.abs(curv(z + 200)) > 0.0012) continue;
-      out.push({ z, h: 40, up: 75, deck: 80, down: 110 }); last = z;
+    for (const z of [3300, 3900, 4500]) out.push({ z, h: 55, up: 90, deck: 110, down: 150 });   // dirt jump line
+    let last = 4600;
+    for (let z = 5200; z < CLIFF_W - 1800; z += 40) {
+      if (z - last < 1300 || Math.abs(curv(z)) > 0.0009 || Math.abs(curv(z + 300)) > 0.0012) continue;
+      out.push({ z, h: 75, up: 115, deck: 170, down: 200 }); last = z;
     }
     return out;
   })();
@@ -187,8 +187,7 @@ const DurangoLevel = (() => {
     // table-tops (+ flowers hanging over each gap)
     TABLES.forEach((j, i) => {
       add({ type: "kicker", z: j.z, x: cx(j.z), w: TW * sec(j.z) + 10 });
-      add({ type: "flower", z: j.z + j.deck * 0.5, x: cx(j.z + j.deck * 0.5), h: 60, hue: i % 3 });
-      add({ type: "flower", z: j.z + j.deck + 40, x: cx(j.z + j.deck + 40), h: 55, hue: (i + 1) % 3 });
+      for (let k = 0; k < 3; k++) { const zz = j.z + 150 + k * 170; add({ type: "flower", z: zz, x: cx(zz), h: [150, 220, 170][k], hue: (i + k) % 3 }); }
     });
     add({ type: "sign", z: TABLES[0].z - 400, x: cx(TABLES[0].z - 400) + 100 * sec(TABLES[0].z - 400), text: L.jumpSign, color: "#a47148" });
     // flowers along the trail, sitting in the line
@@ -251,6 +250,8 @@ const DurangoLevel = (() => {
   }
 
   // ---------- Bike physics (same model as the skis: gravity, grip, real airs) ----------
+  function minSpeed(z) { return z > TOWN ? 360 : 380 + 120 * clamp(z / CLIFF_W, 0, 1); }
+
   // ---------- Bike physics ----------
   // Gravity along the real slope, air drag + rolling resistance, pedaling on the flats, and
   // tire grip that limits how hard you can turn (berms add grip). The bike naturally follows
@@ -260,6 +261,14 @@ const DurangoLevel = (() => {
     const prevHeading = s.heading;
     let u = s.vx * Math.sin(s.heading) + s.v * Math.cos(s.heading);
     const d = perp(s.x, s.z), onTrail = Math.abs(d) < TW / 2 + 10;
+    if (s.air && s.z < CLIFF_W - 200) {
+      // air control: big jumps bend toward where the trail goes, so you land on it
+      const sp = Math.hypot(s.vx, s.v), dir = Math.atan2(s.vx, s.v);
+      const target = trailDir(s.z + 150) + clamp(-perp(s.x, s.z) / 120, -0.7, 0.7);
+      const nd = dir + clamp(target - dir, -2.4 * dt, 2.4 * dt);
+      s.vx = sp * Math.sin(nd); s.v = sp * Math.cos(nd);
+      s.heading += nd - dir;
+    }
     if (s.air) {
       // in the air left/right spins (slowly at first so bumps don't spin you out)
       const rate = s.airT < 0.28 ? 2.5 : 10;
@@ -292,10 +301,9 @@ const DurangoLevel = (() => {
       const ah = ax * sn + az * cs;
       const roll = onTrail ? 18 : 160;                          // rolling resistance (dirt vs forest floor)
       u += (ah - 0.0011 * u * Math.abs(u) - roll * Math.sign(u)) * dt;
-      if (s.state === "ride" && u < 250 && s.z < TOWN) u += 220 * dt;   // she pedals
-      if (s.state === "ride" && s.z > TOWN && u < 300) u += 260 * dt;    // and sprints Main Ave
       if (s.boostT > 0) u += 260 * dt;
-      u = clamp(u, 60, 640);
+      // always fast, and only ever faster: a floor that rises down the mountain
+      if (s.state !== "arrive") u = clamp(u, minSpeed(s.z), minSpeed(s.z) + 200);
       w += (ax * cs - az * sn) * 0.6 * dt;                      // a berm's slope pushes her into the turn
       w *= Math.exp(-(onTrail ? 10 : 6) * dt);                  // tires grip
       if (s.state === "tumble") { u *= 1 - 1.2 * dt; w *= 1 - 3 * dt; }
@@ -313,7 +321,7 @@ const DurangoLevel = (() => {
       const gv = (gNew - s.y) / dt;
       if (s.state === "ride" && gv < s.vy - G * dt * 1.6 - 30) {
         s.air = true; s.airT = 0; s.bigAir = false; s.spinAcc = 0;
-        if (TABLES.some((j) => Math.abs(s.z - j.z) < 40) && onTrail) { s.vy += 60; Sfx.tone(300, 0.3, "triangle", 0.08, 0, 700); }
+        if (TABLES.some((j) => s.z > j.z - 30 && s.z < j.z + 60) && onTrail) { s.vy += 120; Sfx.tone(260, 0.4, "triangle", 0.09, 0, 900); }
         s.vy -= G_AIR * dt; s.y += s.vy * dt;
       } else { s.vy = gv; s.y = gNew; }
     } else {
@@ -449,6 +457,9 @@ const DurangoLevel = (() => {
         r.lean = clamp(Math.atan(r.v * (nh - (r.heading || 0)) / Math.max(dt, 1e-3) / G), -0.8, 0.8) * 0.5 + (r.lean || 0) * 0.5;
         r.heading = nh; r.x = nx;
       }
+      // they hit the jumps too
+      if (r.mode !== "fly" && !r.jump) { const j = TABLES.find((q) => r.z > q.z && r.z - r.v * dt <= q.z); if (j) r.jump = { t: 0, T: 2.0, H: 240 }; }
+      if (r.jump) { r.jump.t += dt; const q = r.jump.t / r.jump.T; r.h = r.jump.H * 4 * q * (1 - q); if (q >= 1) { r.jump = null; r.h = 0; } }
       // don't ride through her
       if (Math.abs(r.z - s.z) < 40 && Math.abs(r.x - s.x) < 44) r.x += Math.sign(r.x - s.x || 1) * 120 * dt;
     });

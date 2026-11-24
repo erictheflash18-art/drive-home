@@ -7,7 +7,7 @@ const Ski3D = (() => {
   let sparkle, tracks, theme = {};
   let terrain, tGeo, trees, rocks, pillows, shadow, peng, spray, snow, mountains;
   let built = [], dyn = {}, texCache = {};
-  let world, lastT = 0, camY = null, camLX = 0, camYaw = 0, originKey = "";
+  let world, lastT = 0, camY = null, camLookY = null, camLX = 0, camYaw = 0, originKey = "";
   const NX = 72, NZ = 150;
   // grid offsets: ~25 units apart near her, stretching to ±2900 sideways and 3800 ahead
   const XOFF = Array.from({ length: NX + 1 }, (_, i) => { const u = i / NX * 2 - 1; return Math.sign(u) * (Math.abs(u) * 600 + Math.pow(Math.abs(u), 3) * 2300); });
@@ -591,7 +591,7 @@ const Ski3D = (() => {
       ch.position.set(i ? 40 : -40, i * 30, 0); dyn.gp.add(ch);
     });
     dyn.gp.visible = false; scene.add(dyn.gp);
-    lastT = s.t; camY = null; camLX = s.x; camYaw = 0;
+    lastT = s.t; camY = null; camLookY = null; camLX = s.x; camYaw = 0;
   }
 
   function drawNote(x) {
@@ -751,13 +751,15 @@ const Ski3D = (() => {
     const cx = s.x - Math.sin(camYaw) * back, cz = s.z - Math.cos(camYaw) * back;
     camLX = cx;
     const ty = Math.max(world.ground(cx, cz), sy + 6) + up;
-    camY = camY == null ? ty : camY + (ty - camY) * Math.min(1, dt * 3.5);
+    camY = camY == null ? ty : camY + (ty - camY) * Math.min(1, dt * (s.air && s.h > 40 ? 7 : 3.5));
     // never let the camera sink into the snow (or behind a lip between it and her)
     camY = Math.max(camY, world.ground(cx, cz) + 30, world.ground((cx + s.x) / 2, (cz + s.z) / 2) + 26);
     const shake = Engine.shake || 0;
     camera.position.set(cx + rand(-1, 1) * shake * 0.8, camY + rand(-1, 1) * shake * 0.8, -cz);
     const lx = s.x + Math.sin(camYaw) * 330, lz = s.z + Math.cos(camYaw) * 330;
-    camera.lookAt(lx, s.mode === "fly" ? sy - 70 : Math.min(world.ground(lx, lz), sy) + 4, -lz);
+    const bigAir = s.mode !== "fly" && s.air && s.h > 50 ? clamp((s.h - 50) / 120, 0, 1) : 0;   // look up with her in big air
+    camLookY = camLookY == null ? sy : camLookY + ((s.mode === "fly" ? sy - 70 : Math.min(world.ground(lx, lz), sy) + 4 + bigAir * (sy - world.ground(lx, lz)) * 0.55) - camLookY) * Math.min(1, dt * 6);
+    camera.lookAt(lx, camLookY, -lz);
     camera.rotateZ(-s.lean * 0.1);
 
     placeInstances(s);
