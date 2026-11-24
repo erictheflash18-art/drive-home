@@ -379,7 +379,7 @@ const DurangoLevel = (() => {
     const steer = Engine.steer();
     if (steer) s.heading += steer * 1.8 * dt; else s.heading -= s.heading * Math.min(1, 1.5 * dt);
     s.heading = clamp(s.heading, -0.75, 0.75);
-    s.lean += (-steer * 0.0 + s.heading * 0.6 - s.lean) * Math.min(1, dt * 5);
+    s.lean += (s.heading * 1.1 - s.lean) * Math.min(1, dt * 5);   // bank hard into the turn
     const sp = 540;
     s.vx = sp * Math.sin(s.heading); s.v = sp * Math.cos(s.heading);
     s.x += s.vx * dt; s.z += s.v * dt;
@@ -594,6 +594,16 @@ const DurangoLevel = (() => {
       const w = ctx.measureText(txt).width + 24;
       ctx.fillStyle = "rgba(27,31,46,.72)"; Art.rr(ctx, W / 2 - w / 2, 92, w, 30, 15); ctx.fill();
       ctx.fillStyle = "#fff"; ctx.fillText(txt, W / 2, 113);
+    }
+    if (s.mode === "fly" && !s.chute) {   // wind rushing past
+      ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineCap = "round";
+      for (let i = 0; i < 22; i++) {
+        const a = i * 2.39996, q = (s.t * 1.6 + i * 0.137) % 1, r0 = 60 + q * 520, len = 30 + q * 90;
+        const cxp = W / 2, cyp = H * 0.45, ca = Math.cos(a), sa = Math.sin(a);
+        ctx.globalAlpha = q * (1 - q) * 3; ctx.lineWidth = 1 + q * 2.5;
+        ctx.beginPath(); ctx.moveTo(cxp + ca * r0, cyp + sa * r0 * 1.4); ctx.lineTo(cxp + ca * (r0 + len), cyp + sa * (r0 + len) * 1.4); ctx.stroke();
+      }
+      ctx.restore();
     }
     if (s.mode === "fly") {
       ctx.font = "800 15px 'Baloo 2', sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#1b1f2e";

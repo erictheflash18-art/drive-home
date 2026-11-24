@@ -4,7 +4,7 @@
 
 const Ski3D = (() => {
   let renderer, glCanvas, scene, camera, sun, hemi, sky, fog;
-  let sparkle, tracks, theme = {};
+  let sparkle, tracks, trails, theme = {};
   let terrain, tGeo, trees, rocks, pillows, shadow, peng, spray, snow, mountains;
   let built = [], dyn = {}, texCache = {};
   let world, lastT = 0, camY = null, camLookY = null, camLX = 0, camYaw = 0, originKey = "";
@@ -177,16 +177,44 @@ const Ski3D = (() => {
       const pack = new THREE.Mesh(new THREE.BoxGeometry(12, 12, 5), mat("#e63946")); pack.position.set(0, 12, 9); body.add(pack);
     }
     for (const sx of [-1, 1]) {
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 22, 6), black); arm.position.set(sx * 9, 8, -10); arm.rotation.x = -1.0; body.add(arm);
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 22, 6), black); arm.position.set(sx * 9, 8, -10); arm.rotation.x = -1.0; body.add(arm); (rig.arms = rig.arms || []).push(arm);
       const crank = new THREE.Group(); crank.position.set(sx * 4, 16, 2); root.add(crank); rig.cranks.push(crank);
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 14, 6), black); leg.position.set(0, 7, 0); crank.add(leg);
       const foot = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 6), mat("#f7a21b")); foot.scale.set(1, 0.6, 1.4); foot.position.set(0, 0, -1); crank.add(foot);
     }
     // wingsuit wings + parachute (hidden until the cliff)
-    const wingMat = new THREE.MeshLambertMaterial({ color: "#f15bb5", side: THREE.DoubleSide });
-    rig.wings = new THREE.Mesh(new THREE.PlaneGeometry(64, 26), wingMat); rig.wings.rotation.x = -Math.PI / 2; rig.wings.position.set(0, 10, 0); rig.wings.visible = false; body.add(rig.wings);
+    rig.wings = makeWingsuit(rival); rig.wings.visible = false; root.add(rig.wings);
     root.userData.rig = rig;
     return root;
+  }
+
+  // A proper wingsuit: delta wing from wrists to feet + tail wing, pink fading to purple tips,
+  // white leading edges, a little dihedral. Tips flutter in flight.
+  function makeWingsuit(rival) {
+    const g = new THREE.Group();
+    const P = { N: [0, 22, -32], LT: [-50, 27, 2], LH: [-13, 20, 22], T: [0, 19, 38], RH: [13, 20, 22], RT: [50, 27, 2], C: [0, 21, 2] };
+    const col = rival ? { N: "#7b1e3a", tip: "#2b2d42", hip: "#5f0f40", C: "#9d0208" } : { N: "#f15bb5", tip: "#7b2cbf", hip: "#c9184a", C: "#ff70a6" };
+    const tris = [["N", "LT", "C"], ["LT", "LH", "C"], ["LH", "T", "C"], ["T", "RH", "C"], ["RH", "RT", "C"], ["RT", "N", "C"]];
+    const pos = [], cl = [];
+    const cOf = (k) => new THREE.Color(k === "N" ? col.N : k === "C" ? col.C : (k === "LT" || k === "RT") ? col.tip : col.hip);
+    for (const tri of tris) for (const k of tri) { pos.push(...P[k]); const c = cOf(k); cl.push(c.r, c.g, c.b); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(cl, 3));
+    geo.computeVertexNormals();
+    const wing = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+    g.add(wing);
+    // white leading edges + stripes
+    const edge = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+    const bar = (a, b, w) => {
+      const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b), len = va.distanceTo(vb);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.2, len), edge);
+      m.position.copy(va.clone().add(vb).multiplyScalar(0.5)); m.lookAt(vb); g.add(m); return m;
+    };
+    bar(P.N, P.LT, 2.4); bar(P.N, P.RT, 2.4);
+    bar([-30, 25.5, -10], [-10, 21.5, 14], 1.4); bar([30, 25.5, -10], [10, 21.5, 14], 1.4);
+    g.userData = { geo, P, tris };
+    return g;
   }
 
   function poseBike(r, s, dt, speed) {
@@ -194,11 +222,26 @@ const Ski3D = (() => {
     r.bike.visible = !fly;
     r.wings.visible = fly;
     r.cranks.forEach((c) => (c.visible = !fly));
+    (r.arms || []).forEach((a) => (a.visible = !fly));
     const spin = speed * dt / 12;
     r.wheels.forEach((w) => (w.rotation.x -= spin));
     r.crank = (r.crank || 0) + (s.air || fly ? 0 : spin * 0.5);
     r.cranks.forEach((c, i) => { const a = r.crank + i * Math.PI; c.position.set((i ? 1 : -1) * 4, 16 + Math.sin(a) * 5, 2 + Math.cos(a) * 5); });
-    if (fly) { r.body.position.set(0, 22, 0); r.body.rotation.set(-1.35, 0, -(s.lean || 0) * 0.6); return; }
+    if (fly) {
+      if (s.chute) {   // hanging under the canopy, suit folded up
+        r.body.position.set(0, 18, 0); r.body.rotation.set(-0.15, 0, 0);
+        r.wings.scale.set(0.35, 1, 0.5); r.wings.position.set(0, 4, 4);
+      } else {         // flat out, head first
+        r.body.position.set(0, 31, 10); r.body.rotation.set(-1.45, 0, 0);   // lying on top of the suit, head out front
+        r.wings.scale.set(1, 1, 1); r.wings.position.set(0, 0, 0);
+        // flutter the wingtips
+        const u = r.wings.userData, p = u.geo.attributes.position, f = Math.sin((s.t || 0) * 19) * 1.8;
+        let i = 0;
+        for (const tri of u.tris) for (const k of tri) { const b = u.P[k]; p.setXYZ(i++, b[0], b[1] + ((k === "LT" || k === "RT") ? f : (k === "T" ? -f * 0.6 : 0)), b[2]); }
+        p.needsUpdate = true;
+      }
+      return;
+    }
     const crouch = (s.comp || 0) + (s.air ? 0.3 : 0);
     r.body.position.set((s.lean || 0) * 4, 32 - crouch * 6, 4);
     r.body.rotation.set(-0.35 - crouch * 0.3, 0, 0);
@@ -390,6 +433,26 @@ const Ski3D = (() => {
     return g;
   }
 
+  // striped canopy + lines down to her
+  function makeChute() {
+    const g = new THREE.Group();
+    const geo = new THREE.SphereGeometry(70, 18, 6, 0, Math.PI * 2, 0, Math.PI / 2.3);
+    const cols = ["#ff595e", "#ffca3a", "#4cc9f0", "#ffffff"].map((c) => new THREE.Color(c));
+    const p = geo.attributes.position, cl = [];
+    for (let i = 0; i < p.count; i++) { const a = Math.atan2(p.getX(i), p.getZ(i)); const k = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 12) % 4; cl.push(cols[k].r, cols[k].g, cols[k].b); }
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(cl, 3));
+    const canopy = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: false }));
+    canopy.scale.set(1, 0.5, 0.75); canopy.position.y = 120; g.add(canopy);
+    const lineMat = new THREE.MeshBasicMaterial({ color: "#555" });
+    for (const [x, z] of [[-60, -20], [60, -20], [-60, 20], [60, 20], [0, -50], [0, 50]]) {
+      const a = new THREE.Vector3(x, 122, z * 0.75), b = new THREE.Vector3(0, 40, 0), len = a.distanceTo(b);
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, len, 3), lineMat);
+      m.position.copy(a.clone().add(b).multiplyScalar(0.5)); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), a.clone().sub(b).normalize()); g.add(m);
+    }
+    g.userData.canopy = canopy;
+    return g;
+  }
+
   // ---------- build ----------
   function init(stage) {
     if (renderer) return true;
@@ -545,7 +608,9 @@ const Ski3D = (() => {
         const banner = textSprite(o.label, "#fff", 22, o.color || "#ff6b00"); banner.position.set(o.x, Math.max(w.ground(o.x - o.w / 2, o.z), w.ground(o.x + o.w / 2, o.z)) + 82, -o.z); banner.center.set(0.5, 0.5); m.add(banner);
         dyn.gates.push([o, m]);
       } else if (o.type === "ring") {
-        m = new THREE.Mesh(new THREE.TorusGeometry(46, 5, 10, 32), new THREE.MeshBasicMaterial({ color: "#ffd60a" }));
+        m = new THREE.Mesh(new THREE.TorusGeometry(46, 4.5, 10, 40), new THREE.MeshBasicMaterial({ color: "#ffd60a", fog: false }));
+        const glow = new THREE.Mesh(new THREE.TorusGeometry(46, 13, 8, 40), new THREE.MeshBasicMaterial({ color: "#fff3b0", transparent: true, opacity: 0.3, depthWrite: false, fog: false }));
+        m.add(glow);
         m.position.set(o.x, o.y, -o.z); dyn.rings.push([o, m]);
       } else if (o.type === "building") {
         m = makeBuilding(o); m.position.set(o.x, w.ground(o.x, o.z), -o.z); m.rotation.y = o.side > 0 ? -Math.PI / 2 : Math.PI / 2;
@@ -576,8 +641,9 @@ const Ski3D = (() => {
       scene.add(m); built.push(m);
     }
     for (const r of s.rivals || []) { const m = makeBiker(r.color, true); const lbl = textSprite(r.name, "#f1e3c8", 9, "#7b1e3a"); lbl.position.set(0, 68, 0); m.add(lbl); scene.add(m); dyn.rivals.push([r, m]); }
-    dyn.chute = sprite("bigchute", 160, 120, (x) => { x.fillStyle = "#ff595e"; x.beginPath(); x.arc(80, 70, 74, Math.PI, 0); x.fill(); x.fillStyle = "#ffca3a"; for (let k = 0; k < 4; k++) { x.beginPath(); x.moveTo(80, 70); x.arc(80, 70, 74, Math.PI + k * Math.PI / 4, Math.PI + (k + 0.5) * Math.PI / 4); x.fill(); } }, 110, false);
-    dyn.chute.visible = false; scene.add(dyn.chute);
+    dyn.chute = makeChute(); dyn.chute.visible = false; scene.add(dyn.chute);
+    trails = makePoints(360); trails.userData = { i: 0, p: [] }; scene.add(trails);
+    for (let i = 0; i < 360; i++) trails.userData.p.push({ life: 0 });
     dyn.chad = makeSled(true); dyn.chad.visible = false; scene.add(dyn.chad);
     dyn.bang = textSprite("!!", "#e63946", 26); dyn.bang.position.set(0, 86, 0); dyn.chad.add(dyn.bang);
     dyn.gp = new THREE.Group();
@@ -770,7 +836,10 @@ const Ski3D = (() => {
     for (const [o, m] of dyn.notes) { m.visible = !o.got; m.position.set(o.x, world.ground(o.x, o.z), -o.z); }
     for (const [o, m] of dyn.flowers) if (o.type === "gift" && m.visible) m.position.set(o.x, world.ground(o.x, o.z), -o.z);
     for (const [o, m] of dyn.gates) m.visible = o.z > s.z - 200 && o.z < s.z + 3000;
-    for (const [o, m] of dyn.rings) { m.visible = !o.got && o.z > s.z - 100; m.rotation.z = s.t; }
+    for (const [o, m] of dyn.rings) {
+      if (o.got) { m.userData.t = (m.userData.t || 0) + dt; m.visible = m.userData.t < 0.45; m.scale.setScalar(1 + m.userData.t * 3); m.position.set(o.x, o.y, -o.z); continue; }
+      m.visible = o.z > s.z - 100; m.rotation.z = s.t * 0.8; m.children[0].material.opacity = 0.25 + 0.15 * Math.sin(s.t * 6);
+    }
     for (const [r, m] of dyn.rivals) {
       m.visible = r.on && Math.abs(r.z - s.z) < 2600;
       if (!m.visible) continue;
@@ -781,7 +850,21 @@ const Ski3D = (() => {
     }
     dyn.fans.forEach((m, i) => { m.children[2].position.y = 42 + Math.abs(Math.sin(s.t * 6 + i)) * 8; });   // fans bounce their signs
     dyn.chute.visible = !!s.chute;
-    if (s.chute) dyn.chute.position.set(s.x, sy + 110, -s.z);
+    if (s.chute) {
+      dyn.chuteT = Math.min(1, (dyn.chuteT || 0) + dt * 2);
+      const k = 0.2 + 0.8 * (1 - Math.pow(1 - dyn.chuteT, 3));
+      dyn.chute.position.set(s.x, sy - 22, -s.z); dyn.chute.scale.set(k, k, k);
+      dyn.chute.rotation.set(0, -s.heading, Math.sin(s.t * 1.3) * 0.08 - s.heading * 0.3);
+    } else dyn.chuteT = 0;
+    // contrails off her wingtips
+    if (s.mode === "fly" && !s.chute) for (const sx of [-1, 1]) {
+      const tip = new THREE.Vector3(sx * 50, 27, 2); peng.localToWorld(tip);
+      const u = trails.userData;
+      for (let n = 0; n < 2; n++) { const q = u.p[u.i]; u.i = (u.i + 1) % u.p.length; q.x = tip.x; q.y = tip.y; q.z = tip.z; q.life = q.max = rand(0.6, 0.9); }
+    }
+    { const u = trails.userData, tp = trails.geometry.attributes.position, ts = trails.geometry.attributes.size, ta = trails.geometry.attributes.alpha;
+      u.p.forEach((q, i) => { if (q.life > 0) { q.life -= dt; q.y -= 6 * dt; tp.setXYZ(i, q.x, q.y, q.z); ts.setX(i, 3 + (1 - q.life / q.max) * 9); ta.setX(i, 0.7 * q.life / q.max); } else ta.setX(i, 0); });
+      tp.needsUpdate = ts.needsUpdate = ta.needsUpdate = true; trails.material.uniforms.uScale.value = spray.material.uniforms.uScale.value; }
     for (const [o, m] of dyn.sleds) {
       m.visible = o.go && !o.got;
       if (m.visible) { m.position.set(o.x, world.ground(o.x, o.z), -o.z); m.rotation.y = o.dir > 0 ? -Math.PI / 2 : Math.PI / 2; }
