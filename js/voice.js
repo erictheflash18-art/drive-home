@@ -7,7 +7,7 @@ const VOICE_SKIP = new Set([
   "title", "subtitle", "soundHint", "lockedText", "name", "signs", "devilsThumbSign", "floodSign",
   "backSign", "finalSign", "toePrompt", "comingSoon",
   "birthdayCountdown", "birthdayTomorrow", "birthdayToday",
-  "refs", "hotSpringsSign", "passSign", "wcSign", "roadSign", "memoryFound", "keepSkiing", "sledYell", "shake", "skierYell", "keepPaddling", "bottleFound", "pushedIn", "rvSurvived", "rvDestroyed", "summitSign", "trailSign", "checkpoint", "completeTitle",
+  "refs", "hotSpringsSign", "startSign", "jumpSign", "dropSign", "cliffSign", "raceStartGate", "welcomeGate", "finishGate", "shops", "giftFound", "keepRiding", "certificate", "certButton", "finaleTitle", "finaleSub", "passSign", "wcSign", "roadSign", "memoryFound", "keepSkiing", "sledYell", "shake", "skierYell", "keepPaddling", "bottleFound", "pushedIn", "rvSurvived", "rvDestroyed", "summitSign", "trailSign", "checkpoint", "completeTitle",
   "saveTitle", "saveHelp", "copyButton", "copied", "loadHelp", "loadButton", "loadedOk", "loadedBad",
 ]);
 

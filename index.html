@@ -7,7 +7,7 @@
   <title>Drive Home Again</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=11222149">
+  <link rel="stylesheet" href="css/style.css?v=11231844">
 </head>
 <body>
   <!-- ============ MAP SCREEN ============ -->
@@ -26,6 +26,7 @@
       <div class="loot-row"><span>Bikes hit</span><b id="bikeTotal">0</b><span>🚲</span></div>
       <div class="loot-row"><span>Cars totalled</span><b id="carTotal">0</b><span>💥</span></div>
       <div class="bracelet" id="bracelet"></div>
+      <button id="certOpen" class="big-btn cert-open" hidden></button>
     </div>
     <details class="savebox" id="savebox">
       <summary id="saveTitle"></summary>
@@ -92,19 +93,46 @@
     </div>
   </section>
 
-  <script src="js/lines.js?v=11222149"></script>
-  <script src="js/schedule.js?v=11222149"></script>
-  <script src="js/art.js?v=11222149"></script>
-  <script src="js/engine.js?v=11222149"></script>
-  <script src="audio/manifest.js?v=11222149"></script>
-  <script src="photos/manifest.js?v=11222149"></script>
-  <script src="js/voice.js?v=11222149"></script>
-  <script src="js/level-boulder.js?v=11222149"></script>
-  <script src="js/level-kenosha.js?v=11222149"></script>
-  <script src="js/level-buenavista.js?v=11222149"></script>
-  <script src="js/vendor/three.min.js?v=11222149"></script>
-  <script src="js/ski3d.js?v=11222149"></script>
-  <script src="js/level-wolfcreek.js?v=11222149"></script>
-  <script src="js/main.js?v=11222149"></script>
+  <div id="cert" class="cert-wrap">
+    <div class="cert-scroll">
+      <div id="finaleHead" class="finale-head">
+        <h1 id="finaleTitle"></h1>
+        <p id="finaleSub"></p>
+        <div class="finale-bracelet" id="finaleBracelet"></div>
+        <div class="complete-stats" id="finaleStats"></div>
+        <p id="finaleNote" class="note"></p>
+      </div>
+      <div id="certCard" class="cert">
+        <div class="cert-inner">
+          <div class="cert-flowers">🌼 🌼 🌼</div>
+          <h2 id="certTitle"></h2>
+          <div id="certTo" class="cert-to"></div>
+          <p id="certBody"></p>
+          <ul id="certItems"></ul>
+          <div id="certCharms" class="cert-charms"></div>
+          <div class="cert-row"><span id="certFrom"></span><span id="certDate"></span></div>
+          <div id="certStats" class="cert-stats"></div>
+          <div id="certFine" class="cert-fine"></div>
+        </div>
+      </div>
+      <div class="cert-btns"><button id="certPrint" class="big-btn"></button><button id="certClose" class="big-btn ghost">Back to the map</button></div>
+    </div>
+  </div>
+
+  <script src="js/lines.js?v=11231844"></script>
+  <script src="js/schedule.js?v=11231844"></script>
+  <script src="js/art.js?v=11231844"></script>
+  <script src="js/engine.js?v=11231844"></script>
+  <script src="audio/manifest.js?v=11231844"></script>
+  <script src="photos/manifest.js?v=11231844"></script>
+  <script src="js/voice.js?v=11231844"></script>
+  <script src="js/level-boulder.js?v=11231844"></script>
+  <script src="js/level-kenosha.js?v=11231844"></script>
+  <script src="js/level-buenavista.js?v=11231844"></script>
+  <script src="js/vendor/three.min.js?v=11231844"></script>
+  <script src="js/ski3d.js?v=11231844"></script>
+  <script src="js/level-wolfcreek.js?v=11231844"></script>
+  <script src="js/level-durango.js?v=11231844"></script>
+  <script src="js/main.js?v=11231844"></script>
 </body>
 </html>

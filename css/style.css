@@ -288,3 +288,36 @@ h1 { font-size: 28px; line-height: 1.1; margin: 10px 0 6px; color: var(--gold); 
   background: #fff; padding: 6px; box-shadow: 0 3px 0 rgba(0,0,0,.15); margin-bottom: 10px; }
 .memory-card img[hidden] { display: none; }
 .memory-card p { font-size: 18px; line-height: 1.35; margin: 0 0 14px; text-align: left; }
+
+/* ---------- Finale + gift certificate ---------- */
+.cert-wrap { position: fixed; inset: 0; z-index: 60; display: none; background: linear-gradient(#ffd6e7, #fff3c4); overflow: auto; }
+.cert-wrap.show { display: block; }
+.cert-scroll { max-width: 560px; margin: 0 auto; padding: 24px 16px 40px; }
+.finale-head { text-align: center; color: var(--ink); }
+.finale-head h1 { font-size: 34px; line-height: 1.05; margin: 8px 0; color: var(--red); }
+.finale-head p { margin: 0 0 12px; font-weight: 600; }
+.finale-bracelet { display: flex; justify-content: center; gap: 8px; font-size: 34px; margin: 8px 0 14px; }
+.finale-bracelet span { width: 50px; height: 50px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); display: grid; place-items: center; animation: pop .5s both; }
+@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+.cert { background: #fffdf6; border-radius: 10px; padding: 12px; margin: 18px 0; box-shadow: 0 10px 30px rgba(0,0,0,.15); color: var(--ink); }
+.cert-inner { border: 4px double #c9a227; border-radius: 6px; padding: 22px 18px; text-align: center; }
+.cert-flowers { font-size: 26px; letter-spacing: 6px; }
+.cert h2 { font-size: 32px; margin: 6px 0 4px; letter-spacing: 1px; text-transform: uppercase; color: #9c6b12; }
+.cert-to { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.cert p { font-size: 17px; margin: 6px 0; }
+.cert ul { list-style: none; padding: 0; margin: 10px 0; font-size: 19px; font-weight: 700; }
+.cert li { margin: 6px 0; }
+.cert-charms { font-size: 28px; letter-spacing: 6px; margin: 8px 0; }
+.cert-row { display: flex; justify-content: space-between; font-weight: 800; margin-top: 14px; border-top: 1px dashed #c9a227; padding-top: 10px; }
+.cert-stats { font-size: 13px; opacity: .7; margin-top: 8px; }
+.cert-fine { font-size: 12px; opacity: .6; margin-top: 8px; font-style: italic; }
+.cert-btns { display: flex; flex-direction: column; gap: 10px; }
+.big-btn.ghost { background: #fff; color: var(--ink); border: 3px solid var(--ink); }
+.cert-open { margin-top: 12px; width: 100%; }
+@media print {
+  body * { visibility: hidden !important; }
+  .cert-wrap, .cert-wrap .cert-scroll { position: static !important; background: none !important; overflow: visible !important; }
+  #certCard, #certCard * { visibility: visible !important; }
+  #certCard { position: absolute; left: 0; top: 0; width: 100%; margin: 0; box-shadow: none; }
+  .cert-inner { padding: 40px; }
+}

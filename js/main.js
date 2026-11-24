@@ -1,6 +1,6 @@
 // Map screen, level switching, level-complete card.
 
-const LEVELS = { boulder: BoulderLevel, kenosha: KenoshaLevel, buenaVista: BuenaVistaLevel, wolfCreek: WolfCreekLevel };
+const LEVELS = { boulder: BoulderLevel, kenosha: KenoshaLevel, buenaVista: BuenaVistaLevel, wolfCreek: WolfCreekLevel, durango: DurangoLevel };
 
 const Game = {
   init() {
@@ -14,6 +14,12 @@ const Game = {
     document.querySelector(".cut-art").innerHTML = SNACK_SVG;
     $("toeBtn").querySelector("span").textContent = LINES.toePrompt;
     $("completeBtn").addEventListener("click", () => this.toMap());
+    const C = LINES.durango.certificate;
+    $("certPrint").textContent = C.printButton;
+    $("certPrint").addEventListener("click", () => window.print());
+    $("certClose").addEventListener("click", () => { $("cert").classList.remove("show"); this.toMap(); });
+    $("certOpen").textContent = C.mapButton;
+    $("certOpen").addEventListener("click", () => this.showCertificate(false));
     $("quitBtn").addEventListener("click", () => this.toMap());
     Engine.init();
     this.renderMap();
@@ -86,6 +92,7 @@ const Game = {
     $("toeTotal").textContent = t.toes;
     $("bikeTotal").textContent = Save.stat("bikesHit");
     $("carTotal").textContent = Save.stat("carsTotalled");
+    $("certOpen").hidden = !Save.data.levels.durango;
     $("bracelet").innerHTML = STOPS.map((st) => {
       const has = Save.data.levels[st.id] && Save.data.levels[st.id].charm;
       return `<span class="charm ${has ? "has" : ""}" title="${st.charmName}">${has ? st.charm : ""}</span>`;
@@ -123,6 +130,46 @@ const Game = {
     $("completeNote").textContent = d.note;
     Voice.play(d.note, "interrupt");
     $("complete").classList.add("show");
+  },
+
+  // The very end: birthday screen + the printable gift certificate
+  showFinale(d) {
+    this.showCertificate(true, d);
+    Voice.play(LINES.durango.note, "interrupt");
+    if (Engine.level && Engine.level.stop) Engine.level.stop();
+    Engine.level = null;
+  },
+
+  showCertificate(withFinale, d) {
+    const L = LINES.durango, C = L.certificate;
+    $("finaleHead").hidden = !withFinale;
+    if (withFinale) {
+      $("finaleTitle").textContent = L.finaleTitle;
+      $("finaleSub").textContent = L.finaleSub;
+      $("finaleBracelet").innerHTML = STOPS.map((st, i) => `<span style="animation-delay:${0.3 + i * 0.35}s">${st.charm}</span>`).join("");
+      $("finaleStats").innerHTML = "";
+      for (const st of (d && d.extra) || []) {
+        const el = document.createElement("div");
+        el.innerHTML = `${st.icon} <b></b><small></small>`;
+        el.querySelector("b").textContent = st.value; el.querySelector("small").textContent = st.label;
+        $("finaleStats").appendChild(el);
+      }
+      $("finaleNote").textContent = L.note;
+      Confetti.burst(200, Engine.W);
+    }
+    $("certTitle").textContent = C.title;
+    $("certTo").textContent = C.to;
+    $("certBody").textContent = C.body;
+    $("certItems").innerHTML = "";
+    for (const it of C.items) { const li = document.createElement("li"); li.textContent = it; $("certItems").appendChild(li); }
+    $("certCharms").textContent = STOPS.map((st) => st.charm).join(" ");
+    $("certFrom").textContent = C.from;
+    $("certDate").textContent = "Nov 25, 2026";
+    const tot = Save.totals();
+    $("certStats").textContent = `Earned on the drive home: ${tot.flowers} flowers · ${tot.toes} toes hooked · ${Save.stat("bikesHit")} bikes hit · ${Save.stat("carsTotalled")} cars totalled`;
+    $("certFine").textContent = C.fine;
+    $("cert").classList.add("show");
+    $("cert").scrollTop = 0;
   },
 
   toMap() {

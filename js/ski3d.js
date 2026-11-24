@@ -4,7 +4,7 @@
 
 const Ski3D = (() => {
   let renderer, glCanvas, scene, camera, sun, hemi, sky, fog;
-  let sparkle, tracks;
+  let sparkle, tracks, theme = {};
   let terrain, tGeo, trees, rocks, pillows, shadow, peng, spray, snow, mountains;
   let built = [], dyn = {}, texCache = {};
   let world, lastT = 0, camY = null, camLX = 0, camYaw = 0, originKey = "";
@@ -93,20 +93,20 @@ const Ski3D = (() => {
   }
 
   // ---------- models ----------
-  function treeGeo() {
+  function treeGeo(desert) {
     const parts = [{ geo: new THREE.CylinderGeometry(3, 4, 16, 6), color: "#5c4033", m: M(0, 8, 0) }];
     for (let i = 0; i < 3; i++) {
       const y = 14 + i * 22, r = 30 - i * 8;
       parts.push({ geo: new THREE.ConeGeometry(r, 34, 7), color: i % 2 ? "#2d6a4f" : "#1f5040", m: M(0, y + 17, 0) });
-      parts.push({ geo: new THREE.ConeGeometry(r * 0.62, 14, 7), color: "#f4f8fc", m: M(0, y + 28, 0) });
+      parts.push({ geo: new THREE.ConeGeometry(r * 0.62, 14, 7), color: desert ? "#2f6b4a" : "#f4f8fc", m: M(0, y + 28, 0) });
     }
     return merge(parts);
   }
-  function rockGeo() {
+  function rockGeo(desert) {
     const r = new THREE.DodecahedronGeometry(1, 0);
     const cap = new THREE.DodecahedronGeometry(0.75, 0);
-    return merge([{ geo: r, color: "#4a5363", m: M(0, 0.35, 0, 1, 0.8, 1) },
-      { geo: cap, color: "#f4f8fc", m: M(0.05, 0.92, 0, 0.9, 0.28, 0.9) }]);
+    return merge([{ geo: r, color: desert ? "#a5553a" : "#4a5363", m: M(0, 0.35, 0, 1, 0.8, 1) },
+      { geo: cap, color: desert ? "#c98a5e" : "#f4f8fc", m: M(0.05, 0.92, 0, 0.9, 0.28, 0.9) }]);
   }
 
   // The penguin, rigged: skis on the snow, legs, a body that crouches/leans, arms that hold poles.
@@ -143,6 +143,65 @@ const Ski3D = (() => {
     }
     root.userData.rig = rig;
     return root;
+  }
+
+  // The penguin on her mountain bike (white helmet under the party hat, like the photos)
+  function makeBiker(frameColor, rival) {
+    const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+    const black = mat(rival ? "#1d3557" : "#1b1f2e"), tire = mat("#222"), frame = mat(frameColor || "#2a9d8f"), grey = mat("#adb5bd");
+    const root = new THREE.Group();
+    const rig = { root, bike: new THREE.Group(), wheels: [], cranks: [] };
+    root.add(rig.bike);
+    for (const z of [-24, 22]) {
+      const w = new THREE.Mesh(new THREE.TorusGeometry(12, 2.6, 8, 20), tire); w.rotation.y = Math.PI / 2; w.position.set(0, 13, z); rig.bike.add(w); rig.wheels.push(w);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 4, 6), grey); hub.rotation.z = Math.PI / 2; hub.position.set(0, 13, z); rig.bike.add(hub);
+    }
+    const bar = (len, x, y, z, rx) => { const b = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, len), frame); b.position.set(x, y, z); b.rotation.x = rx; rig.bike.add(b); };
+    bar(34, 0, 24, -2, 0.12);     // top tube
+    bar(30, 0, 18, -8, -0.55);    // down tube
+    bar(22, 0, 16, 13, 0.5);      // chain stay
+    const fork = new THREE.Mesh(new THREE.BoxGeometry(2.4, 18, 2.4), frame); fork.position.set(0, 20, -22); fork.rotation.x = -0.3; rig.bike.add(fork);
+    const hb = new THREE.Mesh(new THREE.BoxGeometry(26, 2, 2), grey); hb.position.set(0, 30, -19); rig.bike.add(hb);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 10), mat("#111")); seat.position.set(0, 30, 9); rig.bike.add(seat);
+    const body = new THREE.Group(); body.position.set(0, 32, 4); root.add(body); rig.body = body;
+    const torso = new THREE.Mesh(new THREE.SphereGeometry(10, 14, 12), black); torso.scale.set(1, 1.25, 0.95); torso.position.y = 9; body.add(torso);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(8, 12, 10), mat(rival ? "#ffd7b5" : "#26304a")); head.position.set(0, 25, -2); body.add(head);
+    if (rival) {
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(8.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat("#7b1e3a")); cap.position.set(0, 26, -2); body.add(cap);
+    } else {
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(8.8, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat("#f8f9fa")); helmet.position.set(0, 27, -2); body.add(helmet);
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(14, 3.5, 3), mat("#6c5ce7")); visor.position.set(0, 27, -10); body.add(visor);
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(2.2, 6, 6), mat("#f7a21b")); beak.rotation.x = -Math.PI / 2; beak.position.set(0, 23, -10.5); body.add(beak);
+      const hat = new THREE.Mesh(new THREE.ConeGeometry(5, 13, 10), mat("#9b5de5")); hat.position.set(0, 40, -2); body.add(hat);
+      const pom = new THREE.Mesh(new THREE.SphereGeometry(2.4, 8, 6), mat("#f15bb5")); pom.position.set(0, 47, -2); body.add(pom);
+      const pack = new THREE.Mesh(new THREE.BoxGeometry(12, 12, 5), mat("#e63946")); pack.position.set(0, 12, 9); body.add(pack);
+    }
+    for (const sx of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 22, 6), black); arm.position.set(sx * 9, 8, -10); arm.rotation.x = -1.0; body.add(arm);
+      const crank = new THREE.Group(); crank.position.set(sx * 4, 16, 2); root.add(crank); rig.cranks.push(crank);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 14, 6), black); leg.position.set(0, 7, 0); crank.add(leg);
+      const foot = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 6), mat("#f7a21b")); foot.scale.set(1, 0.6, 1.4); foot.position.set(0, 0, -1); crank.add(foot);
+    }
+    // wingsuit wings + parachute (hidden until the cliff)
+    const wingMat = new THREE.MeshLambertMaterial({ color: "#f15bb5", side: THREE.DoubleSide });
+    rig.wings = new THREE.Mesh(new THREE.PlaneGeometry(64, 26), wingMat); rig.wings.rotation.x = -Math.PI / 2; rig.wings.position.set(0, 10, 0); rig.wings.visible = false; body.add(rig.wings);
+    root.userData.rig = rig;
+    return root;
+  }
+
+  function poseBike(r, s, dt, speed) {
+    const fly = s.mode === "fly";
+    r.bike.visible = !fly;
+    r.wings.visible = fly;
+    r.cranks.forEach((c) => (c.visible = !fly));
+    const spin = speed * dt / 12;
+    r.wheels.forEach((w) => (w.rotation.x -= spin));
+    r.crank = (r.crank || 0) + (s.air || fly ? 0 : spin * 0.5);
+    r.cranks.forEach((c, i) => { const a = r.crank + i * Math.PI; c.position.set((i ? 1 : -1) * 4, 16 + Math.sin(a) * 5, 2 + Math.cos(a) * 5); });
+    if (fly) { r.body.position.set(0, 22, 0); r.body.rotation.set(-1.35, 0, -(s.lean || 0) * 0.6); return; }
+    const crouch = (s.comp || 0) + (s.air ? 0.3 : 0);
+    r.body.position.set((s.lean || 0) * 4, 32 - crouch * 6, 4);
+    r.body.rotation.set(-0.35 - crouch * 0.3, 0, 0);
   }
 
   // pose the rig from the skier's state
@@ -274,6 +333,63 @@ const Ski3D = (() => {
     p.needsUpdate = true;
   }
 
+  function dirtTexture() {
+    const c = document.createElement("canvas"); c.width = c.height = 256;
+    const x = c.getContext("2d");
+    x.fillStyle = "#ffffff"; x.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 2600; i++) {
+      const a = Math.random() * 0.12;
+      x.fillStyle = Math.random() < 0.6 ? `rgba(90,60,30,${a})` : `rgba(255,240,210,${a * 2})`;
+      x.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3, 1 + Math.random() * 3);
+    }
+    for (let i = 0; i < 160; i++) { // grass tufts
+      x.strokeStyle = `rgba(80,90,40,${0.1 + Math.random() * 0.15})`; x.lineWidth = 1;
+      const px = Math.random() * 256, py = Math.random() * 256;
+      for (let k = 0; k < 4; k++) { x.beginPath(); x.moveTo(px, py); x.lineTo(px + rand(-4, 4), py - rand(4, 9)); x.stroke(); }
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
+    return t;
+  }
+
+  // a storefront on Main Ave (faces the street)
+  function makeBuilding(o) {
+    const g = new THREE.Group();
+    const key = "bld" + o.color + o.text;
+    const { tex } = canvasTex(key, 256, 256, (x) => {
+      x.fillStyle = o.color; x.fillRect(0, 0, 256, 256);
+      x.fillStyle = "rgba(255,255,255,.12)"; for (let yy = 0; yy < 256; yy += 16) x.fillRect(0, yy, 256, 2);   // brick lines
+      x.fillStyle = "#2b2d42"; for (let k = 0; k < 3; k++) { x.fillRect(24 + k * 76, 40, 52, 60); }          // upstairs windows
+      x.fillStyle = "#ffe8a3"; for (let k = 0; k < 3; k++) { x.fillRect(28 + k * 76, 44, 44, 52); }
+      x.fillStyle = "#1b1f2e"; x.fillRect(16, 150, 224, 96);                                              // shop window
+      x.fillStyle = "#ffd166"; x.fillRect(22, 156, 212, 84);
+      x.fillStyle = o.awning || "#e63946"; x.fillRect(8, 118, 240, 26);
+      x.fillStyle = "#fff"; x.font = "800 22px 'Baloo 2', sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(o.text, 128, 132);
+    });
+    const front = new THREE.MeshLambertMaterial({ map: tex }), side = new THREE.MeshLambertMaterial({ color: o.color });
+    const b = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.h, 70), [side, side, side, side, front, side]);
+    b.position.set(0, o.h / 2, 0); g.add(b);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(o.w + 6, 6, 76), new THREE.MeshLambertMaterial({ color: "#4a4e69" })); roof.position.y = o.h + 3; g.add(roof);
+    return g;
+  }
+
+  function makeHouse(o) {
+    const g = new THREE.Group();
+    const wall = new THREE.MeshLambertMaterial({ color: "#f4e1c1" }), roofM = new THREE.MeshLambertMaterial({ color: "#7b3f2b" });
+    const b = new THREE.Mesh(new THREE.BoxGeometry(150, 80, 110), wall); b.position.y = 40; g.add(b);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(115, 60, 4), roofM); roof.rotation.y = Math.PI / 4; roof.position.y = 110; roof.scale.set(1, 1, 0.8); g.add(roof);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(26, 44, 2), new THREE.MeshLambertMaterial({ color: "#2a9d8f" })); door.position.set(0, 22, 56); g.add(door);
+    const banner = textSprite("HAPPY BIRTHDAY REESE", "#fff", 18, "#f15bb5"); banner.position.set(0, 150, 60); banner.center.set(0.5, 0.5); g.add(banner);
+    ["#f15bb5", "#ffd60a", "#4cc9f0", "#9b5de5", "#06d6a0"].forEach((c, i) => {
+      const bl = new THREE.Mesh(new THREE.SphereGeometry(9, 10, 8), new THREE.MeshLambertMaterial({ color: c })); bl.scale.set(1, 1.2, 1);
+      bl.position.set(-70 + i * 35, 120 + (i % 2) * 14, 64); g.add(bl);
+      const str = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 40, 3), new THREE.MeshBasicMaterial({ color: "#888" })); str.position.set(-70 + i * 35, 96, 64); g.add(str);
+    });
+    g.rotation.y = Math.PI; // door faces up the street toward her
+    return g;
+  }
+
   // ---------- build ----------
   function init(stage) {
     if (renderer) return true;
@@ -290,12 +406,14 @@ const Ski3D = (() => {
 
   function build(w) {
     world = w;
+    theme = w.theme || {};
+    const desert = !!theme.desert;
     if (scene) dispose();
     scene = new THREE.Scene();
-    fog = new THREE.Fog("#dde4ec", 300, 2300);
+    fog = new THREE.Fog(desert ? "#efd9b6" : "#dde4ec", 300, 2300);
     scene.fog = fog;
     camera = new THREE.PerspectiveCamera(66, 0.5, 2, 9000);
-    hemi = new THREE.HemisphereLight("#ffffff", "#8fb0dc", 0.9); scene.add(hemi);
+    hemi = desert ? new THREE.HemisphereLight("#fff4e0", "#9c7a55", 0.85) : new THREE.HemisphereLight("#ffffff", "#8fb0dc", 0.9); scene.add(hemi);
     sun = new THREE.DirectionalLight("#fff6e8", 0.55); sun.position.set(-0.6, 0.8, -0.5); scene.add(sun); scene.add(sun.target);
 
     // sky dome
@@ -321,34 +439,36 @@ const Ski3D = (() => {
     tGeo = new THREE.PlaneGeometry(1, 1, NX, NZ);
     tGeo.rotateX(-Math.PI / 2);
     tGeo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(tGeo.attributes.position.count * 3), 3));
-    terrain = new THREE.Mesh(tGeo, new THREE.MeshPhongMaterial({ vertexColors: true, map: snowTexture(), shininess: 18, specular: new THREE.Color("#2a3440"), side: THREE.DoubleSide }));
+    terrain = new THREE.Mesh(tGeo, new THREE.MeshPhongMaterial({ vertexColors: true, map: desert ? dirtTexture() : snowTexture(), shininess: desert ? 4 : 18, specular: new THREE.Color(desert ? "#1a1208" : "#2a3440"), side: THREE.DoubleSide }));
     terrain.frustumCulled = false;
     scene.add(terrain);
     originKey = "";
 
-    trees = new THREE.InstancedMesh(treeGeo(), new THREE.MeshLambertMaterial({ vertexColors: true }), MAX_TREES);
-    rocks = new THREE.InstancedMesh(rockGeo(), new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 0 }), MAX_ROCKS);
+    trees = new THREE.InstancedMesh(treeGeo(desert), new THREE.MeshLambertMaterial({ vertexColors: true }), MAX_TREES);
+    rocks = new THREE.InstancedMesh(rockGeo(desert), new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 0 }), MAX_ROCKS);
     const pg = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
     pillows = new THREE.InstancedMesh(pg, new THREE.MeshLambertMaterial({ color: "#f7fafd" }), MAX_PILLOWS);
     for (const im of [trees, rocks, pillows]) { im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(im); }
 
     shadow = new THREE.Mesh(new THREE.CircleGeometry(16, 20), new THREE.MeshBasicMaterial({ color: "#5a6f8c", transparent: true, opacity: 0.28, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
-    peng = makePenguin(); scene.add(peng);
+    peng = w.rider === "bike" ? makeBiker() : makePenguin(); scene.add(peng);
 
     spray = makePoints(420); spray.userData = { i: 0, p: [] }; scene.add(spray);
+    if (desert) spray.material.uniforms.uColor.value.set("#c9a27a");
     for (let i = 0; i < 420; i++) spray.userData.p.push({ life: 0 });
     snow = makePoints(600); scene.add(snow);
     sparkle = makePoints(260); scene.add(sparkle);
     sparkle.userData = { p: [] };
     for (let i = 0; i < 260; i++) sparkle.userData.p.push({ ph: Math.random() * 6.28, rate: rand(2, 5) });
     tracks = makeTracks(); scene.add(tracks);
+    if (desert) { tracks.material.color.set("#6e4a30"); sparkle.visible = false; snow.visible = !!theme.snow; }
     snow.userData = { p: [] };
     for (let i = 0; i < 600; i++) snow.userData.p.push({ v: rand(30, 70) });
 
     // per-object models
     const s = w.s;
-    dyn = { sleds: [], notes: [], flowers: [], snickers: [] };
+    dyn = { sleds: [], notes: [], flowers: [], snickers: [], gates: [], rings: [], rivals: [] };
     for (const o of s.objs) {
       let m = null;
       if (o.type === "flower") {
@@ -359,6 +479,13 @@ const Ski3D = (() => {
         m.position.set(o.x, w.ground(o.x, o.z) + 28, -o.z);
       } else if (o.type === "note") {
         m = sprite("note", 128, 192, drawNote, 46, true);
+      } else if (o.type === "gift") {
+        m = new THREE.Group();
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(10, 18, 900, 12, 1, true), new THREE.MeshBasicMaterial({ color: "#ffe066", transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+        beam.position.y = 450; m.add(beam);   // a light beam so she can find it from far away
+        const box = sprite("gift", 128, 128, (x) => { const g = x.createRadialGradient(64, 64, 8, 64, 64, 64); g.addColorStop(0, "rgba(255,230,120,.9)"); g.addColorStop(1, "rgba(255,230,120,0)"); x.fillStyle = g; x.fillRect(0, 0, 128, 128); x.font = "76px serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("🎁", 64, 70); }, 64);
+        box.position.y = 30; m.add(box);
+        m.position.set(o.x, w.ground(o.x, o.z), -o.z);
       } else if (o.type === "charm") {
         m = sprite("charm", 128, 128, (x) => {
           const g = x.createRadialGradient(64, 64, 10, 64, 64, 64); g.addColorStop(0, "rgba(255,230,120,.9)"); g.addColorStop(1, "rgba(255,230,120,0)");
@@ -410,6 +537,26 @@ const Ski3D = (() => {
           const fl = new THREE.Mesh(new THREE.PlaneGeometry(14, 9), new THREE.MeshLambertMaterial({ color: "#ff6b00", side: THREE.DoubleSide }));
           fl.position.set(px + sx * 7, w.ground(px, o.z) + 41, -o.z); m.add(fl);
         }
+      } else if (o.type === "gate") {
+        // checkpoint arch over the trail
+        m = new THREE.Group();
+        const pm = new THREE.MeshLambertMaterial({ color: o.color || "#ff6b00" });
+        for (const sx of [-1, 1]) { const px = o.x + sx * o.w / 2; const post = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 90, 8), pm); post.position.set(px, w.ground(px, o.z) + 45, -o.z); m.add(post); }
+        const banner = textSprite(o.label, "#fff", 22, o.color || "#ff6b00"); banner.position.set(o.x, Math.max(w.ground(o.x - o.w / 2, o.z), w.ground(o.x + o.w / 2, o.z)) + 82, -o.z); banner.center.set(0.5, 0.5); m.add(banner);
+        dyn.gates.push([o, m]);
+      } else if (o.type === "ring") {
+        m = new THREE.Mesh(new THREE.TorusGeometry(46, 5, 10, 32), new THREE.MeshBasicMaterial({ color: "#ffd60a" }));
+        m.position.set(o.x, o.y, -o.z); dyn.rings.push([o, m]);
+      } else if (o.type === "building") {
+        m = makeBuilding(o); m.position.set(o.x, w.ground(o.x, o.z), -o.z); m.rotation.y = o.side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      } else if (o.type === "house") {
+        m = makeHouse(o); m.position.set(o.x, w.ground(o.x, o.z), -o.z);
+      } else if (o.type === "deck") {
+        // a wooden drop: deck + ramp off the edge
+        m = new THREE.Group();
+        const wood = new THREE.MeshLambertMaterial({ color: "#a47148" });
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(o.w, 6, 120), wood); deck.position.set(o.x, w.ground(o.x, o.z - 60) + 2, -(o.z - 60)); m.add(deck);
+        for (let k = -1; k <= 1; k += 2) for (const dz of [0, 100]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(5, 60, 5), wood); leg.position.set(o.x + k * o.w / 2.4, w.ground(o.x, o.z - dz) - 26, -(o.z - dz)); m.add(leg); }
       } else if (o.type === "sled") {
         m = makeSled(false);
         const y = textSprite(o.yell, "#e63946", 14); y.position.set(0, 80, 0); m.add(y);
@@ -418,9 +565,12 @@ const Ski3D = (() => {
       if (!m) continue;
       o.mesh = m;
       if (o.type === "note") dyn.notes.push([o, m]);
-      if (o.type === "flower" || o.type === "snickers" || o.type === "charm") dyn.flowers.push([o, m]);
+      if (o.type === "flower" || o.type === "snickers" || o.type === "charm" || o.type === "gift") dyn.flowers.push([o, m]);
       scene.add(m); built.push(m);
     }
+    for (const r of s.rivals || []) { const m = makeBiker(r.color, true); const lbl = textSprite(r.name, "#f1e3c8", 9, "#7b1e3a"); lbl.position.set(0, 68, 0); m.add(lbl); scene.add(m); dyn.rivals.push([r, m]); }
+    dyn.chute = sprite("bigchute", 160, 120, (x) => { x.fillStyle = "#ff595e"; x.beginPath(); x.arc(80, 70, 74, Math.PI, 0); x.fill(); x.fillStyle = "#ffca3a"; for (let k = 0; k < 4; k++) { x.beginPath(); x.moveTo(80, 70); x.arc(80, 70, 74, Math.PI + k * Math.PI / 4, Math.PI + (k + 0.5) * Math.PI / 4); x.fill(); } }, 110, false);
+    dyn.chute.visible = false; scene.add(dyn.chute);
     dyn.chad = makeSled(true); dyn.chad.visible = false; scene.add(dyn.chad);
     dyn.bang = textSprite("!!", "#e63946", 26); dyn.bang.position.set(0, 86, 0); dyn.chad.add(dyn.bang);
     dyn.gp = new THREE.Group();
@@ -476,12 +626,13 @@ const Ski3D = (() => {
         p.setXYZ(i, x, world.ground(x, z), -z);
         uv.setXY(i, x / 160, z / 160);
         const out = Math.max(0, Math.abs(x - cxz) - world.HALF);
+        if (world.paint) { const pc = world.paint(x, z); col.setXYZ(i, pc[0], pc[1], pc[2]); continue; }
         c.copy(ice && out < 20 ? iceC : snowC).lerp(bermC, Math.min(1, out / 200));
         col.setXYZ(i, c.r, c.g, c.b);
       }
     }
     // steep faces (cliffs, gully walls) show rock
-    const rockC = new THREE.Color("#5b6474"), rockL = new THREE.Color("#7d8696");
+    const rockC = new THREE.Color(theme.desert ? "#9a4a30" : "#5b6474"), rockL = new THREE.Color(theme.desert ? "#b8683f" : "#7d8696");
     for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix <= NX; ix++) {
       const i = iz * (NX + 1) + ix, j = i + NX + 1;
       const drop = (p.getY(i) - p.getY(j)) / (ZOFF[iz + 1] - ZOFF[iz]) - world.pitch(z0 + ZOFF[iz]);
@@ -525,7 +676,7 @@ const Ski3D = (() => {
 
   function updateParticles(s, dt) {
     // spray: off the downhill ski when carving, a little trail always, huge on landings/crashes
-    if (s.state === "ski" && !s.air) {
+    if ((s.state === "ski" || s.state === "ride") && !s.air && s.mode !== "fly") {
       const carve = Math.abs(s.vx) / 300;
       const n = Math.floor(rand(0, 1) + dt * (25 + 160 * carve) + (s.zoneDeep ? dt * 40 : 0));
       const side = -Math.sign(s.vx || 1);
@@ -566,27 +717,28 @@ const Ski3D = (() => {
     camera.aspect = W / H; camera.updateProjectionMatrix();
     const bufH = renderer.getDrawingBufferSize(new THREE.Vector2()).y;
     const uScale = bufH / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
-    spray.material.uniforms.uScale.value = uScale; snow.material.uniforms.uScale.value = uScale;
+    spray.material.uniforms.uScale.value = uScale; snow.material.uniforms.uScale.value = uScale; sparkle.material.uniforms.uScale.value = uScale;
 
     regenTerrain(s);
     // skier
     const gy = world.ground(s.x, s.z);
-    const sy = gy + s.h * 0.7;
+    const sy = s.mode === "fly" ? s.y : gy + s.h * 0.7;
     peng.position.set(s.x, sy, -s.z);
-    if (s.state === "tumble") { peng.rotation.set(-s.tumbleT * 14, -s.heading, 0, "YXZ"); peng.position.y = gy + 16; pose(s, dt); }
+    if (s.state === "tumble") { peng.rotation.set(-s.tumbleT * 14, -s.heading, 0, "YXZ"); peng.position.y = gy + 16; if (world.rider !== "bike") pose(s, dt); }
     else {
       // skis follow the slope under them, she faces where her skis point
       const nx = (world.ground(s.x + 4, s.z) - world.ground(s.x - 4, s.z)) / 8, nz = (world.ground(s.x, s.z + 4) - world.ground(s.x, s.z - 4)) / 8;
       const pitch = s.air ? clamp(Math.atan2(s.vy, Math.hypot(s.vx, s.v)) * 0.8, -0.7, 0.5) : Math.atan(nz * Math.cos(s.heading) + nx * Math.sin(s.heading));
-      peng.rotation.set(pitch, -s.heading, 0, "YXZ");
-      pose(s, dt);
+      peng.rotation.set(s.mode === "fly" ? 0 : pitch, -s.heading, world.rider === "bike" ? -s.lean * 1.2 : 0, "YXZ");
+      if (world.rider === "bike") poseBike(peng.userData.rig, s, dt, Math.hypot(s.vx, s.v));
+      else pose(s, dt);
     }
     peng.scale.setScalar(s.zoom);
     shadow.position.set(s.x, gy + 0.6, -s.z); shadow.scale.setScalar(Math.max(0.4, 1 - s.h / 260));
 
     // chase camera: low and close, smoothed so it floats over the rolls
     // chase camera: trails behind along her direction of travel, floats over the bumps
-    const back = 205 / Math.max(0.6, s.zoom), up = 72 / Math.max(0.6, s.zoom);
+    const back = (s.mode === "fly" ? 240 : 205) / Math.max(0.6, s.zoom), up = (s.mode === "fly" ? 95 : 72) / Math.max(0.6, s.zoom);
     const travel = s.state === "tumble" ? camYaw : clamp(Math.atan2(s.vx, Math.max(30, s.v)), -0.9, 0.9);
     camYaw += (travel - camYaw) * Math.min(1, dt * 2.2);
     const cx = s.x - Math.sin(camYaw) * back, cz = s.z - Math.cos(camYaw) * back;
@@ -598,7 +750,7 @@ const Ski3D = (() => {
     const shake = Engine.shake || 0;
     camera.position.set(cx + rand(-1, 1) * shake * 0.8, camY + rand(-1, 1) * shake * 0.8, -cz);
     const lx = s.x + Math.sin(camYaw) * 330, lz = s.z + Math.cos(camYaw) * 330;
-    camera.lookAt(lx, Math.min(world.ground(lx, lz), sy) + 4, -lz);
+    camera.lookAt(lx, s.mode === "fly" ? sy - 70 : Math.min(world.ground(lx, lz), sy) + 4, -lz);
     camera.rotateZ(-s.lean * 0.1);
 
     placeInstances(s);
@@ -607,6 +759,19 @@ const Ski3D = (() => {
       if (m.visible && o.type !== "flower") m.position.set(o.x, world.ground(o.x, o.z) + 34 + (o.h || 0) + Math.sin(s.t * 4) * 4, -o.z);
     }
     for (const [o, m] of dyn.notes) { m.visible = !o.got; m.position.set(o.x, world.ground(o.x, o.z), -o.z); }
+    for (const [o, m] of dyn.flowers) if (o.type === "gift" && m.visible) m.position.set(o.x, world.ground(o.x, o.z), -o.z);
+    for (const [o, m] of dyn.gates) m.visible = o.z > s.z - 200 && o.z < s.z + 3000;
+    for (const [o, m] of dyn.rings) { m.visible = !o.got && o.z > s.z - 100; m.rotation.z = s.t; }
+    for (const [r, m] of dyn.rivals) {
+      m.visible = r.on && Math.abs(r.z - s.z) < 2600;
+      if (!m.visible) continue;
+      const ry = r.mode === "fly" ? r.y : world.ground(r.x, r.z) + (r.h || 0);
+      m.position.set(r.x, ry, -r.z);
+      m.rotation.set(r.crash ? -r.crashT * 10 : 0, -(r.heading || 0), -(r.lean || 0), "YXZ");
+      poseBike(m.userData.rig, r, dt, r.v || 300);
+    }
+    dyn.chute.visible = !!s.chute;
+    if (s.chute) dyn.chute.position.set(s.x, sy + 110, -s.z);
     for (const [o, m] of dyn.sleds) {
       m.visible = o.go && !o.got;
       if (m.visible) { m.position.set(o.x, world.ground(o.x, o.z), -o.z); m.rotation.y = o.dir > 0 ? -Math.PI / 2 : Math.PI / 2; }
@@ -620,7 +785,7 @@ const Ski3D = (() => {
       dyn.bang.visible = c.phase === "windup";
       dyn.chad.traverse((m) => { if (m.material) { m.material.transparent = c.fade > 0; m.material.opacity = 1 - c.fade; } });
     }
-    if (s.gp && s.z < world.GRANDPARENTS + 400) {
+    if (s.gp && world.GRANDPARENTS && s.z < world.GRANDPARENTS + 400) {
       dyn.gp.visible = true;
       const gx = world.cx(world.GRANDPARENTS) + world.HALF - 30;
       dyn.gp.position.set(gx, world.ground(gx, world.GRANDPARENTS) + s.gp.alt, -world.GRANDPARENTS);
@@ -628,14 +793,14 @@ const Ski3D = (() => {
 
     // weather: storm → bluebird
     const st = s.storm;
-    const horizon = lerpColor("#d6ebfb", "#dde4ec", st), zenith = lerpColor("#3d8fd8", "#a9b6c6", st);
+    const horizon = theme.desert ? lerpColor("#f7dcb0", "#f4c99a", s.dusk || 0) : lerpColor("#d6ebfb", "#dde4ec", st), zenith = theme.desert ? lerpColor("#3f8fdc", "#6a5acd", s.dusk || 0) : lerpColor("#3d8fd8", "#a9b6c6", st);
     fog.color.copy(horizon); fog.near = 260 + 260 * (1 - st); fog.far = 2300 + 1300 * (1 - st);
     const sc = sky.geometry.attributes.color, sp = sky.geometry.attributes.position;
     for (let i = 0; i < sc.count; i++) { const t = clamp(sp.getY(i) / 3500, 0, 1); const cc = horizon.clone().lerp(zenith, Math.pow(t, 0.6)); sc.setXYZ(i, cc.r, cc.g, cc.b); }
     sc.needsUpdate = true;
     sky.position.copy(camera.position);
     mountains.position.set(camera.position.x, camera.position.y - 200, camera.position.z);
-    mountains.children[0].material.color.copy(lerpColor("#b4c6dc", "#c6ced8", st));
+    mountains.children[0].material.color.copy(theme.desert ? new THREE.Color("#a08cb0") : lerpColor("#b4c6dc", "#c6ced8", st));
     sun.intensity = 0.4 + 0.45 * (1 - st);
     hemi.intensity = 0.92 - 0.12 * (1 - st);
 
@@ -658,7 +823,7 @@ const Ski3D = (() => {
   // where the penguin is on the 2D overlay (for gear flying, -1 flower)
   function skierScreen(s, W, H) {
     if (!camera) return { x: W / 2, y: H * 0.6 };
-    const v = V(s.x, world.ground(s.x, s.z) + 20, -s.z).project(camera);
+    const v = V(s.x, (s.mode === "fly" ? s.y : world.ground(s.x, s.z)) + 20, -s.z).project(camera);
     return { x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H };
   }
 
