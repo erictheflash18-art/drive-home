@@ -413,6 +413,7 @@ const LINES = {
     landTown: "Main Ave. Race it home.",
     welcomeGate: "WELCOME TO DURANGO",
     finishGate: "RACE FINISH",
+    fanSigns: ["GO REESE", "HBD REESE", "HOOK THE TOE", "YO JOHN", "ΣΤΓ STINKS", "🌼🌼🌼", "SEND IT", "SO CLOSE", "THE WATER IS COLD", "HOME STRETCH", "WE LOVE YOU REESE", "1 MORE DAY"],
     shops: ["COFFEE", "BIKE SHOP", "TACOS", "BOOKS", "FLOWERS", "ICE CREAM", "GEAR", "PIZZA", "BAKERY", "RECORDS"],
     chadCrash: "Chad crashed into the flower shop.",
     raceWin: "YOU WON. ΣΤΓ IS DONE. FOREVER.",

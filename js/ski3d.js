@@ -468,7 +468,7 @@ const Ski3D = (() => {
 
     // per-object models
     const s = w.s;
-    dyn = { sleds: [], notes: [], flowers: [], snickers: [], gates: [], rings: [], rivals: [] };
+    dyn = { sleds: [], notes: [], flowers: [], snickers: [], gates: [], rings: [], rivals: [], fans: [] };
     for (const o of s.objs) {
       let m = null;
       if (o.type === "flower") {
@@ -551,6 +551,13 @@ const Ski3D = (() => {
         m = makeBuilding(o); m.position.set(o.x, w.ground(o.x, o.z), -o.z); m.rotation.y = o.side > 0 ? -Math.PI / 2 : Math.PI / 2;
       } else if (o.type === "house") {
         m = makeHouse(o); m.position.set(o.x, w.ground(o.x, o.z), -o.z);
+      } else if (o.type === "fan") {
+        // a penguin fan holding up a sign
+        m = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.SphereGeometry(9, 10, 8), new THREE.MeshLambertMaterial({ color: "#1b1f2e" })); body.scale.set(1, 1.4, 1); body.position.y = 13; m.add(body);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(6.5, 10, 8), new THREE.MeshLambertMaterial({ color: "#26304a" })); head.position.y = 30; m.add(head);
+        const sign = textSprite(o.text, "#fff", 13, o.color); sign.position.y = 42; m.add(sign);
+        m.position.set(o.x, w.ground(o.x, o.z), -o.z); dyn.fans.push(m);
       } else if (o.type === "deck") {
         // a wooden drop: deck + ramp off the edge
         m = new THREE.Group();
@@ -770,6 +777,7 @@ const Ski3D = (() => {
       m.rotation.set(r.crash ? -r.crashT * 10 : 0, -(r.heading || 0), -(r.lean || 0), "YXZ");
       poseBike(m.userData.rig, r, dt, r.v || 300);
     }
+    dyn.fans.forEach((m, i) => { m.children[2].position.y = 42 + Math.abs(Math.sin(s.t * 6 + i)) * 8; });   // fans bounce their signs
     dyn.chute.visible = !!s.chute;
     if (s.chute) dyn.chute.position.set(s.x, sy + 110, -s.z);
     for (const [o, m] of dyn.sleds) {
@@ -837,5 +845,5 @@ const Ski3D = (() => {
     built = []; scene = null;
   }
 
-  return { init, build, render, show, skierScreen, _cam: () => camera, _peng: () => peng, get ok() { return !!renderer; } };
+  return { init, build, render, show, skierScreen, _r: () => renderer, _cam: () => camera, _peng: () => peng, get ok() { return !!renderer; } };
 })();

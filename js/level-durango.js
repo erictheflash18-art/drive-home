@@ -201,6 +201,11 @@ const DurangoLevel = (() => {
       n++;
     }
     add({ type: "charm", z: RACE_FINISH + 150, x: cx(RACE_FINISH), h: 0 });
+    // fans on the sidewalks with signs
+    L.fanSigns.forEach((text, i) => {
+      const z = RACE_FINISH - 1800 + i * 260, side = i % 2 ? 1 : -1;
+      add({ type: "fan", z, x: cx(z) + side * (86 + (i % 3) * 6), text, color: ["#e63946", "#2a9d8f", "#9b5de5", "#f4a261"][i % 4] });
+    });
     add({ type: "house", z: FINISH + 140, x: cx(FINISH) });
     s.objs.sort((a, b) => a.z - b.z);
   }
@@ -402,8 +407,8 @@ const DurangoLevel = (() => {
       r.v = clamp((s.v || 300) + clamp((want - r.z) * 1.1, -170, 220), 120, 760);
       r.z += r.v * dt;
       if (r.mode === "fly") {
-        r.y = pathY(r.z) + 20 * Math.sin(r.t + i);
-        r.x += (cx(r.z) + r.lane * 0.8 + 60 * Math.sin(r.t * 0.7 + i) - r.x) * Math.min(1, dt * 1.5);
+        r.y = pathY(r.z) + 40 + i * 35 + 20 * Math.sin(r.t + i);   // fly a little above her, spread out
+        r.x += (cx(r.z) + r.lane * 1.8 + 60 * Math.sin(r.t * 0.7 + i) - r.x) * Math.min(1, dt * 1.5);
       } else {
         const tx = cx(r.z) + (r.z > TOWN ? r.lane * 0.4 : r.lane) + 40 * Math.sin(r.t * 0.9 + i);
         const nx = r.x + (tx - r.x) * Math.min(1, dt * 1.5);
